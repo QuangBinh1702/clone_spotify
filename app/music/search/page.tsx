@@ -308,7 +308,7 @@ const SearchPage: React.FC = () => {
             </div>
           )}
         </section>
-      )
+      )}
 
       {!showResults && (
         <>

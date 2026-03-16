@@ -530,7 +530,7 @@ const QuickPicks: React.FC<{
 
 const SearchResults: React.FC<{
   query: string;
-  results: { tracks: { items: SpotifyTrack[] } } | null;
+  results: { tracks?: { items: SpotifyTrack[] } } | null;
   loading: boolean;
   onPlay: (track: SpotifyTrack, index: number) => void;
   likedTracks: Set<string>;
