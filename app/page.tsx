@@ -288,7 +288,7 @@ const HeroSection: React.FC = () => (
       </div>
 
       <h1 className="max-w-4xl text-5xl font-bold leading-[1.1] tracking-tight md:text-7xl">
-        Build bold interfaces{" "}
+        Build bold interfaces 2222{" "}
         <span className="relative inline-block">
           <span className="relative z-10">without limits</span>
           <span className="absolute bottom-1 left-0 -z-0 h-4 w-full bg-[oklch(0.6747_0.1725_259.61)] md:h-6" />

@@ -36,6 +36,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const isLocalhostPair =
           (target.origin === "http://localhost:3000" &&
             base.origin === "http://127.0.0.1:3000") ||
+            (target.origin === "http://localhost:3000" &&
+              base.origin === "https://4q1fxqtg-3000.asse.devtunnels.ms") ||
           (target.origin === "http://127.0.0.1:3000" &&
             base.origin === "http://localhost:3000");
 

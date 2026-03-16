@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-export function middleware(): NextResponse {
+export function proxy(): NextResponse {
   // const host = request.headers.get("host");
   // if (host === "localhost:3000") {
   //   const redirectUrl = request.nextUrl.clone();
