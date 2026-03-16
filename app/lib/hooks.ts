@@ -5,6 +5,9 @@ import type {
   SpotifyTrack,
   SpotifyPlaylist,
   SpotifyArtist,
+  SpotifyUserProfile,
+  SpotifyAlbum,
+  SpotifyShow,
   SpotifyPaginatedResponse,
 } from "@/app/lib/spotify";
 
@@ -119,10 +122,70 @@ export function useSavedTracks(): UseFetchResult<
 }
 
 export function useSearch(query: string): UseFetchResult<{
-  tracks: SpotifyPaginatedResponse<SpotifyTrack>;
+  tracks?: SpotifyPaginatedResponse<SpotifyTrack>;
+  artists?: SpotifyPaginatedResponse<SpotifyArtist>;
+  albums?: SpotifyPaginatedResponse<SpotifyAlbum>;
+  shows?: SpotifyPaginatedResponse<SpotifyShow>;
 }> {
   const url = query.trim()
-    ? `/api/spotify/search?q=${encodeURIComponent(query)}`
+    ? `/api/spotify/search?q=${encodeURIComponent(query)}&type=track`
     : null;
-  return useFetch<{ tracks: SpotifyPaginatedResponse<SpotifyTrack> }>(url);
+  return useFetch<{
+    tracks?: SpotifyPaginatedResponse<SpotifyTrack>;
+    artists?: SpotifyPaginatedResponse<SpotifyArtist>;
+    albums?: SpotifyPaginatedResponse<SpotifyAlbum>;
+    shows?: SpotifyPaginatedResponse<SpotifyShow>;
+  }>(url);
+}
+
+export function useProfile(): UseFetchResult<SpotifyUserProfile> {
+  return useFetch<SpotifyUserProfile>("/api/spotify/profile");
+}
+
+export interface RecentlyPlayedItem {
+  track: SpotifyTrack;
+  played_at: string;
+}
+
+export function useRecentlyPlayed(): UseFetchResult<{
+  items: RecentlyPlayedItem[];
+}> {
+  return useFetch<{ items: RecentlyPlayedItem[] }>("/api/spotify/recently-played");
+}
+
+export function useAlbums(): UseFetchResult<
+  SpotifyPaginatedResponse<{ added_at: string; album: SpotifyAlbum }>
+> {
+  return useFetch<
+    SpotifyPaginatedResponse<{ added_at: string; album: SpotifyAlbum }>
+  >("/api/spotify/albums");
+}
+
+export function useRecommendations(seedArtists: string[]): UseFetchResult<{
+  tracks: SpotifyTrack[];
+}> {
+  const url = seedArtists.length
+    ? `/api/spotify/recommendations?seed_artists=${encodeURIComponent(seedArtists.join(","))}`
+    : null;
+  return useFetch<{ tracks: SpotifyTrack[] }>(url);
+}
+
+export function useSearchTyped(
+  query: string,
+  type: "track" | "artist" | "album" | "show"
+): UseFetchResult<{
+  tracks?: SpotifyPaginatedResponse<SpotifyTrack>;
+  artists?: SpotifyPaginatedResponse<SpotifyArtist>;
+  albums?: SpotifyPaginatedResponse<SpotifyAlbum>;
+  shows?: SpotifyPaginatedResponse<SpotifyShow>;
+}> {
+  const url = query.trim()
+    ? `/api/spotify/search?q=${encodeURIComponent(query)}&type=${type}`
+    : null;
+  return useFetch<{
+    tracks?: SpotifyPaginatedResponse<SpotifyTrack>;
+    artists?: SpotifyPaginatedResponse<SpotifyArtist>;
+    albums?: SpotifyPaginatedResponse<SpotifyAlbum>;
+    shows?: SpotifyPaginatedResponse<SpotifyShow>;
+  }>(url);
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import ThemeToggle from "@/app/components/theme-toggle";
@@ -14,7 +14,6 @@ interface MusicShellProps {
   onSearchChange?: (value: string) => void;
   headerActions?: React.ReactNode;
   rightRail?: React.ReactNode;
-  footer?: React.ReactNode;
 }
 
 const MusicShell: React.FC<MusicShellProps> = ({
@@ -26,9 +25,32 @@ const MusicShell: React.FC<MusicShellProps> = ({
   onSearchChange,
   headerActions,
   rightRail,
-  footer,
 }) => {
   const pathname = usePathname();
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [libraryQuery, setLibraryQuery] = useState("");
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const sidebarItems = useMemo(() => ["Daily Mix 1", "Late Night Code", "Focus Mode", "Neon City", "Workout Raw"], []);
+  const filteredSidebarItems = sidebarItems.filter((item) =>
+    item.toLowerCase().includes(libraryQuery.toLowerCase())
+  );
+
+  useEffect(() => {
+    if (!showSearch) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "/") return;
+      const target = event.target as HTMLElement | null;
+      const isInput =
+        target?.tagName === "INPUT" ||
+        target?.tagName === "TEXTAREA" ||
+        (target as HTMLElement | null)?.isContentEditable;
+      if (isInput) return;
+      event.preventDefault();
+      searchInputRef.current?.focus();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [showSearch]);
   const searchInputProps = onSearchChange
     ? { value: searchQuery ?? "", onChange: (event: React.ChangeEvent<HTMLInputElement>) => onSearchChange(event.target.value) }
     : {};
@@ -82,10 +104,12 @@ const MusicShell: React.FC<MusicShellProps> = ({
               <input
                 className="w-full bg-transparent text-xs text-foreground outline-none placeholder:text-fg-subtle"
                 placeholder="Search in Library"
+                value={libraryQuery}
+                onChange={(event) => setLibraryQuery(event.target.value)}
               />
             </div>
             <div className="mt-4 space-y-2 overflow-y-auto pr-1">
-              {["Daily Mix 1", "Late Night Code", "Focus Mode", "Neon City", "Workout Raw"].map((pl) => (
+              {filteredSidebarItems.map((pl) => (
                 <div key={pl} className="flex items-center gap-3 rounded-[10px] p-2 hover:bg-surface-hover">
                   <span className="h-10 w-10 rounded-[8px] bg-gradient-to-br from-main to-bg-secondary" />
                   <div>
@@ -94,6 +118,9 @@ const MusicShell: React.FC<MusicShellProps> = ({
                   </div>
                 </div>
               ))}
+              {filteredSidebarItems.length === 0 && (
+                <p className="text-xs text-fg-subtle">No matches.</p>
+              )}
             </div>
           </div>
         </aside>
@@ -102,6 +129,13 @@ const MusicShell: React.FC<MusicShellProps> = ({
           <header className="sticky top-0 z-40 border-b border-border-muted bg-background/80 backdrop-blur">
             <div className="flex items-center justify-between px-4 py-3 md:px-6">
               <div className="flex items-center gap-3">
+                <button
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-border-muted bg-surface text-fg-subtle lg:hidden"
+                  onClick={() => setIsMobileSidebarOpen(true)}
+                  aria-label="Open menu"
+                >
+                  <MenuIcon />
+                </button>
                 <button className="hidden rounded-full border border-border-muted bg-surface px-3 py-1 text-xs font-semibold text-fg-subtle md:inline">
                   {subtitle ?? "Listening now"}
                 </button>
@@ -115,6 +149,7 @@ const MusicShell: React.FC<MusicShellProps> = ({
                       type="text"
                       placeholder="Search Spotify tracks..."
                       className="w-full bg-transparent text-sm font-medium text-foreground outline-none placeholder:text-fg-subtle"
+                      ref={searchInputRef}
                       {...searchInputProps}
                     />
                     <span className="hidden rounded-full border border-border-muted px-2 py-0.5 font-mono text-[10px] text-fg-subtle lg:block">/</span>
@@ -135,7 +170,7 @@ const MusicShell: React.FC<MusicShellProps> = ({
             </div>
           </header>
 
-          <div className="flex flex-1 gap-6 px-4 pb-24 pt-6 md:px-6">
+          <div className="flex flex-1 gap-6 px-4 pb-32 pt-6 md:px-6">
             <main className="w-full flex-1">{children}</main>
             <aside className="sticky top-24 hidden h-[calc(100vh-140px)] w-[320px] shrink-0 flex-col gap-4 rounded-[16px] border border-border-muted bg-surface p-4 xl:flex">
               {rightRail ?? (
@@ -177,9 +212,7 @@ const MusicShell: React.FC<MusicShellProps> = ({
         </div>
       </div>
 
-      {footer}
-
-      <nav className="fixed bottom-0 left-0 right-0 z-40 border-t border-border-muted bg-background lg:hidden">
+      <nav className="fixed bottom-[60px] left-0 right-0 z-40 border-t border-border-muted bg-background lg:hidden">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-2">
           {NAV_ITEMS.map((item) => {
             const isActive = pathname === item.href;
@@ -201,6 +234,70 @@ const MusicShell: React.FC<MusicShellProps> = ({
           })}
         </div>
       </nav>
+
+      {isMobileSidebarOpen && (
+        <div className="fixed inset-0 z-50 bg-black/40 lg:hidden" onClick={() => setIsMobileSidebarOpen(false)}>
+          <div
+            className="h-full w-[280px] bg-bg-secondary p-4"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3">
+              <span className="text-sm font-bold">Menu</span>
+              <button
+                onClick={() => setIsMobileSidebarOpen(false)}
+                className="rounded-full border border-border-muted bg-surface p-2 text-fg-subtle"
+                aria-label="Close menu"
+              >
+                <CloseIcon />
+              </button>
+            </div>
+            <div className="space-y-3 rounded-[12px] bg-surface p-2">
+              {NAV_ITEMS.map((item) => {
+                const isActive = pathname === item.href;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    aria-current={isActive ? "page" : undefined}
+                    className={`flex items-center gap-3 rounded-[10px] px-3 py-2 text-sm font-semibold transition-colors ${
+                      isActive ? "bg-surface-hover text-foreground" : "text-fg-subtle hover:text-foreground"
+                    }`}
+                    onClick={() => setIsMobileSidebarOpen(false)}
+                  >
+                    {item.icon}
+                    <span>{item.label}</span>
+                  </Link>
+                );
+              })}
+            </div>
+            <div className="mt-4 rounded-[12px] bg-surface p-3">
+              <div className="flex items-center gap-2 rounded-full border border-border-muted bg-background px-3 py-2">
+                <SearchIcon />
+                <input
+                  className="w-full bg-transparent text-xs text-foreground outline-none placeholder:text-fg-subtle"
+                  placeholder="Search in Library"
+                  value={libraryQuery}
+                  onChange={(event) => setLibraryQuery(event.target.value)}
+                />
+              </div>
+              <div className="mt-4 space-y-2 overflow-y-auto pr-1">
+                {filteredSidebarItems.map((pl) => (
+                  <div key={pl} className="flex items-center gap-3 rounded-[10px] p-2 hover:bg-surface-hover">
+                    <span className="h-10 w-10 rounded-[8px] bg-gradient-to-br from-main to-bg-secondary" />
+                    <div>
+                      <p className="text-sm font-semibold">{pl}</p>
+                      <p className="text-[11px] text-fg-subtle">Playlist ?? 40 songs</p>
+                    </div>
+                  </div>
+                ))}
+                {filteredSidebarItems.length === 0 && (
+                  <p className="text-xs text-fg-subtle">No matches.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -256,6 +353,41 @@ const SearchIcon: React.FC = () => (
   >
     <circle cx="11" cy="11" r="8" />
     <path d="m21 21-4.3-4.3" />
+  </svg>
+);
+
+const MenuIcon: React.FC = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <line x1="4" x2="20" y1="12" y2="12" />
+    <line x1="4" x2="20" y1="6" y2="6" />
+    <line x1="4" x2="20" y1="18" y2="18" />
+  </svg>
+);
+
+const CloseIcon: React.FC = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="18"
+    height="18"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M18 6 6 18" />
+    <path d="m6 6 12 12" />
   </svg>
 );
 

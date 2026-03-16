@@ -5,6 +5,8 @@ const SPOTIFY_SCOPES = [
   "user-read-private",
   "user-top-read",
   "user-library-read",
+  "user-library-modify",
+  "user-read-recently-played",
   "playlist-read-private",
   "playlist-read-collaborative",
 ].join(" ");

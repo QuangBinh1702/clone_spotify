@@ -1,12 +1,11 @@
 "use client";
 
-import React, { useState, useCallback, useRef } from "react";
+import React, { useState } from "react";
 import Image from "next/image";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useSession, signIn, signOut } from "next-auth/react";
-import ThemeToggle from "@/app/components/theme-toggle";
+import { signIn } from "next-auth/react";
 import MusicShell from "@/app/music/components/MusicShell";
+import { useMusicContext, FALLBACK_TRACKS, TRACK_COLORS } from "@/app/music/context";
+import type { FallbackTrack } from "@/app/music/context";
 import {
   useTopTracks,
   useTopArtists,
@@ -23,29 +22,6 @@ import {
 } from "@/app/lib/spotify";
 
 const CURRENT_YEAR = new Date().getFullYear();
-
-/* ────────────────────────────────────────────────────────── */
-/*  Fallback Data (when not connected to Spotify)            */
-/* ────────────────────────────────────────────────────────── */
-
-const FALLBACK_TRACKS: {
-  id: number;
-  title: string;
-  artist: string;
-  album: string;
-  duration: string;
-  color: string;
-  plays: string;
-}[] = [
-  { id: 1, title: "Brutal Sunrise", artist: "Echo Chamber", album: "Concrete Dreams", duration: "3:24", color: "bg-yellow-300", plays: "2.4M" },
-  { id: 2, title: "Pixel Heart", artist: "Neon Flux", album: "Digital Love", duration: "4:01", color: "bg-pink-300", plays: "1.8M" },
-  { id: 3, title: "Raw Signal", artist: "The Borders", album: "Hard Edges", duration: "2:58", color: "bg-green-300", plays: "1.5M" },
-  { id: 4, title: "Shadow Box", artist: "Block Party", album: "4px 4px", duration: "3:47", color: "bg-purple-300", plays: "1.2M" },
-  { id: 5, title: "Mono Chrome", artist: "Sans Serif", album: "Type Face", duration: "5:12", color: "bg-orange-300", plays: "980K" },
-  { id: 6, title: "Bold Move", artist: "Heavy Weight", album: "700", duration: "3:33", color: "bg-cyan-300", plays: "870K" },
-  { id: 7, title: "Grid Collapse", artist: "Flex Box", album: "Layout Wars", duration: "4:15", color: "bg-red-300", plays: "760K" },
-  { id: 8, title: "Offset Dream", artist: "Z-Index", album: "Stacking Context", duration: "3:02", color: "bg-amber-300", plays: "650K" },
-];
 
 const FALLBACK_PLAYLISTS: {
   id: number;
@@ -95,11 +71,6 @@ const QUICK_PICKS = [
   { title: "Liked Songs", subtitle: "248 songs", color: "bg-cyan-300" },
   { title: "On Repeat", subtitle: "Songs you can't stop playing", color: "bg-orange-300" },
 ] as const;
-
-const TRACK_COLORS = [
-  "bg-yellow-300", "bg-pink-300", "bg-green-300", "bg-purple-300",
-  "bg-orange-300", "bg-cyan-300", "bg-red-300", "bg-amber-300",
-];
 
 /* ────────────────────────────────────────────────────────── */
 /*  Icons                                                    */
@@ -258,64 +229,21 @@ const SpotifyLogo: React.FC = () => (
 /* ────────────────────────────────────────────────────────── */
 
 const MusicPage: React.FC = () => {
-  const { data: session, status } = useSession();
-  const isAuthenticated = status === "authenticated" && !!session?.access_token;
+  const {
+    isAuthenticated, isPlaying, togglePlay,
+    currentTrackIndex, currentTrack, currentFallbackTrack,
+    embedUri, likedTracks, toggleLike,
+    searchQuery, activeSearchQuery, handleSearchInput,
+    playTrack, playPlaylist, login, logout,
+  } = useMusicContext();
 
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [activeSearchQuery, setActiveSearchQuery] = useState("");
   const [timeRange, setTimeRange] = useState<"short_term" | "medium_term" | "long_term">("medium_term");
-  const [embedUri, setEmbedUri] = useState<string | null>(null);
-  const [likedTracks, setLikedTracks] = useState<Set<string>>(new Set());
 
   const { data: topTracks, loading: topTracksLoading } = useTopTracks(timeRange);
   const { data: topArtists, loading: topArtistsLoading } = useTopArtists();
   const { data: playlists, loading: playlistsLoading } = usePlaylists();
   const { data: savedTracks } = useSavedTracks();
   const { data: searchResults, loading: searchLoading } = useSearch(activeSearchQuery);
-
-  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const handleSearchInput = useCallback((value: string) => {
-    setSearchQuery(value);
-    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
-    searchTimeoutRef.current = setTimeout(() => {
-      setActiveSearchQuery(value);
-    }, 500);
-  }, []);
-
-  const toggleLike = useCallback((trackId: string) => {
-    setLikedTracks((prev) => {
-      const next = new Set(prev);
-      if (next.has(trackId)) next.delete(trackId);
-      else next.add(trackId);
-      return next;
-    });
-  }, []);
-
-  const handlePlayTrack = useCallback(
-    (uri: string, index: number) => {
-      setCurrentTrackIndex(index);
-      if (isAuthenticated) {
-        setEmbedUri(uri);
-      }
-      setIsPlaying(true);
-    },
-    [isAuthenticated]
-  );
-
-  const handlePlayPlaylist = useCallback(
-    (uri: string) => {
-      if (isAuthenticated) {
-        setEmbedUri(uri);
-        setIsPlaying(true);
-      }
-    },
-    [isAuthenticated]
-  );
-
-  const currentDisplayTrack = topTracks?.items?.[currentTrackIndex] ?? null;
 
   return (
     <MusicShell
@@ -327,14 +255,14 @@ const MusicPage: React.FC = () => {
       headerActions={
         !isAuthenticated ? (
           <button
-            onClick={() => signIn("spotify", { callbackUrl: "/music" })}
+            onClick={login}
             className="rounded-full bg-main px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-black"
           >
             Connect Spotify
           </button>
         ) : (
           <button
-            onClick={() => signOut()}
+            onClick={logout}
             className="rounded-full border border-border-muted bg-surface px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-fg-subtle"
           >
             Disconnect
@@ -344,19 +272,8 @@ const MusicPage: React.FC = () => {
       rightRail={
         <NowPlayingPanel
           isAuthenticated={isAuthenticated}
-          track={currentDisplayTrack}
-          fallbackTrack={FALLBACK_TRACKS[currentTrackIndex % FALLBACK_TRACKS.length]}
-        />
-      }
-      footer={
-        <PlayerBar
-          isPlaying={isPlaying}
-          onToggle={() => setIsPlaying(!isPlaying)}
-          isAuthenticated={isAuthenticated}
-          spotifyTrack={currentDisplayTrack}
-          fallbackTrack={FALLBACK_TRACKS[currentTrackIndex] ?? FALLBACK_TRACKS[0]}
-          onNext={() => setCurrentTrackIndex((i) => (i + 1) % (topTracks?.items?.length || FALLBACK_TRACKS.length))}
-          onPrev={() => setCurrentTrackIndex((i) => (i - 1 + (topTracks?.items?.length || FALLBACK_TRACKS.length)) % (topTracks?.items?.length || FALLBACK_TRACKS.length))}
+          track={currentTrack}
+          fallbackTrack={currentFallbackTrack}
         />
       }
     >
@@ -366,7 +283,7 @@ const MusicPage: React.FC = () => {
           query={activeSearchQuery}
           results={searchResults}
           loading={searchLoading}
-          onPlay={handlePlayTrack}
+          onPlay={playTrack}
           likedTracks={likedTracks}
           onToggleLike={toggleLike}
         />
@@ -374,7 +291,7 @@ const MusicPage: React.FC = () => {
 
       {!activeSearchQuery && (
         <>
-          <HeroSection isPlaying={isPlaying} onToggle={() => setIsPlaying(!isPlaying)} isAuthenticated={isAuthenticated} />
+          <HeroSection isPlaying={isPlaying} onToggle={togglePlay} isAuthenticated={isAuthenticated} />
           <QuickPicks isAuthenticated={isAuthenticated} savedTracks={savedTracks?.items ?? null} />
 
           {/* Spotify Embed Player */}
@@ -406,7 +323,7 @@ const MusicPage: React.FC = () => {
             loading={topTracksLoading}
             timeRange={timeRange}
             onTimeRangeChange={setTimeRange}
-            onPlay={handlePlayTrack}
+            onPlay={playTrack}
             likedTracks={likedTracks}
             onToggleLike={toggleLike}
           />
@@ -417,7 +334,7 @@ const MusicPage: React.FC = () => {
             isAuthenticated={isAuthenticated}
             spotifyPlaylists={playlists?.items ?? null}
             loading={playlistsLoading}
-            onPlayPlaylist={handlePlayPlaylist}
+            onPlayPlaylist={playPlaylist}
           />
 
           <ArtistsSection
@@ -444,236 +361,8 @@ const Skeleton: React.FC<{ className?: string }> = ({ className = "" }) => (
 );
 
 /* ────────────────────────────────────────────────────────── */
-/*  Top Bar                                                  */
+/*  Hero                                                     */
 /* ────────────────────────────────────────────────────────── */
-
-interface TopBarProps {
-  onMenuToggle: () => void;
-  isAuthenticated: boolean;
-  searchQuery: string;
-  onSearchChange: (value: string) => void;
-}
-
-const TopBar: React.FC<TopBarProps> = ({ onMenuToggle, isAuthenticated, searchQuery, onSearchChange }) => {
-  const { data: session } = useSession();
-
-  return (
-    <header className="z-50 flex shrink-0 items-center justify-between border-b border-border-muted bg-background/80 px-4 py-2.5 backdrop-blur md:px-6">
-      <div className="flex items-center gap-3">
-        <button
-          onClick={onMenuToggle}
-          className="cursor-pointer rounded-[5px] border-[2px] border-border-muted p-1.5 text-foreground transition-colors hover:border-foreground hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-main md:hidden"
-          aria-label="Toggle menu"
-        >
-          <MenuIcon />
-        </button>
-        <Link href="/music" className="flex items-center gap-2.5">
-          <span className="flex h-9 w-9 items-center justify-center rounded-[10px] border border-border-muted bg-main text-black">
-            <MusicNoteIcon size={18} />
-          </span>
-          <span className="text-xl font-bold tracking-tight text-foreground">
-            neo<span className="text-main">beats</span>
-          </span>
-        </Link>
-      </div>
-
-      {/* Search */}
-      <div className="hidden max-w-lg flex-1 px-10 md:block">
-        <div className="flex items-center gap-2.5 rounded-full border border-border-muted bg-background px-4 py-2 transition-all focus-within:border-main focus-within:bg-surface">
-          <SearchIcon />
-          <input
-            type="text"
-            placeholder={isAuthenticated ? "Search Spotify tracks..." : "What do you want to listen to?"}
-            className="w-full bg-transparent text-sm font-medium text-foreground outline-none placeholder:text-fg-subtle"
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-          />
-          {searchQuery && (
-            <button onClick={() => onSearchChange("")} className="cursor-pointer text-fg-subtle hover:text-foreground" aria-label="Clear search">
-              <CloseIcon />
-            </button>
-          )}
-          <span className="hidden rounded-full border border-border-muted px-2 py-0.5 font-mono text-[10px] text-fg-subtle lg:block">/</span>
-        </div>
-      </div>
-
-      {/* Right */}
-      <div className="flex items-center gap-2.5">
-        {!isAuthenticated ? (
-          <button
-            onClick={() => signIn("spotify", { callbackUrl: "/music" })}
-            className="rounded-full bg-main px-5 py-2 text-xs font-bold uppercase tracking-wider text-black"
-          >
-            <SpotifyLogo />
-            <span className="hidden md:inline">Connect Spotify</span>
-          </button>
-        ) : (
-          <button
-            onClick={() => signOut()}
-            className="hidden rounded-full border border-border-muted bg-surface px-4 py-2 text-xs font-bold text-fg-subtle md:block"
-          >
-            Disconnect
-          </button>
-        )}
-        <ThemeToggle />
-        <Link
-          href="/music/profile"
-          className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-border-muted bg-surface text-xs font-bold text-foreground transition-colors hover:border-fg-muted"
-          aria-label="Open profile"
-        >
-          {session?.user?.name?.slice(0, 2).toUpperCase() ?? "NB"}
-        </Link>
-      </div>
-    </header>
-  );
-};
-
-/* ────────────────────────────────────────────────────────── */
-/*  Sidebar                                                  */
-/* ────────────────────────────────────────────────────────── */
-
-interface SidebarProps {
-  isOpen: boolean;
-  onClose: () => void;
-  isAuthenticated: boolean;
-  playlists: SpotifyPlaylist[] | null;
-  playlistsLoading: boolean;
-  onPlayPlaylist: (uri: string) => void;
-}
-
-const SIDEBAR_NAV = [
-  { icon: <HomeIcon />, label: "Home", href: "/music" },
-  { icon: <SearchIcon />, label: "Search", href: "/music/search" },
-  { icon: <LibraryIcon />, label: "Library", href: "/music/library" },
-  { icon: <RadioIcon />, label: "Radio", href: "/music/radio" },
-  { icon: <UserIcon />, label: "Profile", href: "/music/profile" },
-];
-
-const Sidebar: React.FC<SidebarProps> = ({
-  isOpen, onClose,
-  isAuthenticated, playlists, playlistsLoading, onPlayPlaylist,
-}) => {
-  const pathname = usePathname();
-
-  return (
-    <>
-    {isOpen && (
-      <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden" onClick={onClose} aria-hidden="true" />
-    )}
-
-      <aside
-        className={`
-        fixed left-0 top-[52px] z-40 flex h-[calc(100vh-52px)] w-[280px] flex-col border-r border-border-muted bg-bg-secondary
-        transition-transform duration-300 ease-out md:static md:h-auto md:translate-x-0
-        ${isOpen ? "translate-x-0" : "-translate-x-full"}
-      `}
-    >
-      <button
-        onClick={onClose}
-        className="absolute right-3 top-3 cursor-pointer rounded-[5px] border-[2px] border-border-muted p-1 text-foreground hover:bg-surface-hover md:hidden"
-        aria-label="Close sidebar"
-      >
-        <CloseIcon />
-      </button>
-
-      <nav className="space-y-1 p-3 pt-4 md:pt-3">
-        {SIDEBAR_NAV.map((item) => {
-          const isActive = pathname === item.href;
-          return (
-            <Link
-              key={item.label}
-              href={item.href}
-              onClick={onClose}
-              aria-current={isActive ? "page" : undefined}
-              className={`flex w-full cursor-pointer items-center gap-3 rounded-[10px] px-3 py-2.5 text-sm font-semibold transition-all ${
-                isActive
-                  ? "bg-surface-hover text-foreground"
-                  : "text-fg-subtle hover:bg-surface-hover hover:text-foreground"
-              }`}
-            >
-              {item.icon}
-              {item.label}
-            </Link>
-          );
-        })}
-      </nav>
-
-      <div className="mx-3 my-2 h-px bg-border-muted" />
-
-      <div className="flex items-center justify-between px-4 py-2">
-        <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-fg-subtle">
-          {isAuthenticated ? "Your Playlists" : "Playlists"}
-        </h3>
-        <button className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-full text-lg font-bold text-fg-subtle transition-colors hover:bg-surface-hover hover:text-foreground">
-          +
-        </button>
-      </div>
-
-      <div className="flex-1 space-y-0.5 overflow-y-auto px-3 pb-4">
-        {playlistsLoading && isAuthenticated ? (
-          Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="flex items-center gap-3 px-3 py-2">
-              <Skeleton className="h-9 w-9 shrink-0" />
-              <div className="flex-1 space-y-1.5">
-                <Skeleton className="h-3 w-24" />
-                <Skeleton className="h-2 w-16" />
-              </div>
-            </div>
-          ))
-        ) : isAuthenticated && playlists && playlists.length > 0 ? (
-          playlists.map((pl) => (
-            <button
-              key={pl.id}
-              onClick={() => handlePlaylistClick(pl, onPlayPlaylist)}
-              className="group flex w-full cursor-pointer items-center gap-3 rounded-[10px] px-3 py-2 text-left transition-all hover:bg-surface-hover"
-            >
-              {pl.images?.[0]?.url ? (
-                <Image
-                  src={pl.images[0].url}
-                  alt={pl.name}
-                  className="h-9 w-9 shrink-0 rounded-[8px] border border-border-muted object-cover"
-                  width={36}
-                  height={36}
-                />
-              ) : (
-                <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] border border-border-muted ${TRACK_COLORS[Number(pl.id.charCodeAt(0)) % TRACK_COLORS.length]}`}>
-                  <MusicNoteIcon size={14} />
-                </span>
-              )}
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-foreground">{pl.name}</p>
-                <p className="text-[10px] font-medium text-fg-subtle">
-                  {(pl.items?.total ?? pl.tracks?.total ?? 0)} tracks
-                </p>
-              </div>
-            </button>
-          ))
-        ) : (
-          FALLBACK_PLAYLISTS.map((pl) => (
-            <a
-              key={pl.id}
-              href="#"
-              className="group flex cursor-pointer items-center gap-3 rounded-[10px] px-3 py-2 transition-all hover:bg-surface-hover"
-            >
-              <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] border border-border-muted ${pl.color}`}>
-                <MusicNoteIcon size={14} />
-              </span>
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-foreground group-hover:text-foreground">{pl.name}</p>
-                <p className="text-[10px] font-medium text-fg-subtle">{pl.tracks} tracks</p>
-              </div>
-            </a>
-          ))
-        )}
-      </div>
-    </aside>
-  </>
-  );
-};
-
-function handlePlaylistClick(pl: SpotifyPlaylist, onPlay: (uri: string) => void): void {
-  onPlay(pl.uri);
-}
 
 /* ────────────────────────────────────────────────────────── */
 /*  Hero                                                     */
@@ -843,7 +532,7 @@ const SearchResults: React.FC<{
   query: string;
   results: { tracks: { items: SpotifyTrack[] } } | null;
   loading: boolean;
-  onPlay: (uri: string, index: number) => void;
+  onPlay: (track: SpotifyTrack, index: number) => void;
   likedTracks: Set<string>;
   onToggleLike: (id: string) => void;
 }> = ({ query, results, loading, onPlay, likedTracks, onToggleLike }) => (
@@ -901,13 +590,13 @@ const SearchResults: React.FC<{
 const TrackRow: React.FC<{
   track: SpotifyTrack;
   index: number;
-  onPlay: (uri: string, index: number) => void;
+  onPlay: (track: SpotifyTrack, index: number) => void;
   isLiked: boolean;
   onToggleLike: (id: string) => void;
 }> = ({ track, index, onPlay, isLiked, onToggleLike }) => (
   <div
     className="group flex cursor-pointer items-center gap-4 rounded-[5px] px-3 py-2.5 transition-all hover:bg-surface-hover md:px-4"
-    onClick={() => onPlay(track.uri, index)}
+    onClick={() => onPlay(track, index)}
   >
     <div className="flex h-8 w-8 shrink-0 items-center justify-center">
       <span className="text-sm font-bold tabular-nums text-fg-subtle group-hover:hidden">
@@ -973,7 +662,7 @@ const TrendingSection: React.FC<{
   loading: boolean;
   timeRange: "short_term" | "medium_term" | "long_term";
   onTimeRangeChange: (range: "short_term" | "medium_term" | "long_term") => void;
-  onPlay: (uri: string, index: number) => void;
+  onPlay: (track: SpotifyTrack, index: number) => void;
   likedTracks: Set<string>;
   onToggleLike: (id: string) => void;
 }> = ({
@@ -1315,23 +1004,13 @@ const FooterSection: React.FC = () => (
 );
 
 /* ────────────────────────────────────────────────────────── */
-/*  Player Bar                                               */
+/*  Now Playing Panel (right rail)                           */
 /* ────────────────────────────────────────────────────────── */
-
-interface PlayerBarProps {
-  isPlaying: boolean;
-  onToggle: () => void;
-  isAuthenticated: boolean;
-  spotifyTrack: SpotifyTrack | null;
-  fallbackTrack: (typeof FALLBACK_TRACKS)[number];
-  onNext: () => void;
-  onPrev: () => void;
-}
 
 const NowPlayingPanel: React.FC<{
   isAuthenticated: boolean;
   track: SpotifyTrack | null;
-  fallbackTrack: (typeof FALLBACK_TRACKS)[number];
+  fallbackTrack: FallbackTrack;
 }> = ({ isAuthenticated, track, fallbackTrack }) => {
   const trackTitle = isAuthenticated && track ? track.name : fallbackTrack.title;
   const trackArtist = isAuthenticated && track
@@ -1398,99 +1077,3 @@ const NowPlayingPanel: React.FC<{
   );
 };
 
-const PlayerBar: React.FC<PlayerBarProps> = ({
-  isPlaying, onToggle, isAuthenticated, spotifyTrack, fallbackTrack,
-  onNext, onPrev,
-}) => {
-  const trackTitle = isAuthenticated && spotifyTrack ? spotifyTrack.name : fallbackTrack.title;
-  const trackArtist = isAuthenticated && spotifyTrack ? spotifyTrack.artists.map((a) => a.name).join(", ") : fallbackTrack.artist;
-  const trackDuration = isAuthenticated && spotifyTrack ? formatDuration(spotifyTrack.duration_ms) : fallbackTrack.duration;
-  const trackColor = isAuthenticated && spotifyTrack ? TRACK_COLORS[spotifyTrack.name.charCodeAt(0) % TRACK_COLORS.length] : fallbackTrack.color;
-  const albumImage = isAuthenticated && spotifyTrack ? getImageUrl(spotifyTrack.album.images, "small") : null;
-
-  return (
-    <div className="relative z-50 shrink-0 border-t-[2px] border-border-muted bg-background">
-      <div className="absolute -top-[2px] left-0 h-[2px] w-full">
-        <div className="h-full w-[35%] bg-main transition-all" />
-      </div>
-
-      <div className="flex items-center justify-between gap-4 px-4 py-2 md:px-6">
-        {/* Track Info */}
-        <div className="flex min-w-0 items-center gap-3">
-          <div className={`flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-[5px] border-[2px] border-black ${trackColor} shadow-brutal-sm ${isPlaying ? "animate-[spin_8s_linear_infinite]" : ""}`}>
-            {albumImage ? (
-              <Image
-                src={albumImage}
-                alt={trackTitle}
-                className="h-full w-full object-cover"
-                width={48}
-                height={48}
-              />
-            ) : (
-              <MusicNoteIcon size={16} />
-            )}
-          </div>
-          <div className="min-w-0">
-            <p className="truncate text-sm font-bold text-foreground">{trackTitle}</p>
-            <p className="truncate text-[11px] font-medium text-fg-subtle">{trackArtist}</p>
-          </div>
-          <button className="ml-2 hidden cursor-pointer text-fg-subtle transition-colors hover:text-pink-400 sm:block" aria-label="Like">
-            <HeartIcon />
-          </button>
-        </div>
-
-        {/* Center controls */}
-        <div className="flex flex-col items-center gap-1.5">
-          <div className="flex items-center gap-4">
-            <button className="hidden cursor-pointer text-fg-subtle transition-colors hover:text-foreground sm:block" aria-label="Shuffle">
-              <ShuffleIcon />
-            </button>
-            <button onClick={onPrev} className="cursor-pointer text-fg-muted transition-colors hover:text-foreground" aria-label="Previous">
-              <SkipBackIcon />
-            </button>
-            <button
-              onClick={onToggle}
-              className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-[5px] border-[2px] border-black bg-main text-black shadow-brutal-sm transition-all hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none"
-              aria-label={isPlaying ? "Pause" : "Play"}
-            >
-              {isPlaying ? <PauseIcon size={14} /> : <PlayIcon size={14} />}
-            </button>
-            <button onClick={onNext} className="cursor-pointer text-fg-muted transition-colors hover:text-foreground" aria-label="Next">
-              <SkipForwardIcon />
-            </button>
-            <button className="hidden cursor-pointer text-fg-subtle transition-colors hover:text-foreground sm:block" aria-label="Repeat">
-              <RepeatIcon />
-            </button>
-          </div>
-
-          <div className="hidden items-center gap-3 md:flex">
-            <span className="w-8 text-right font-mono text-[10px] tabular-nums text-fg-subtle">1:24</span>
-            <div className="group relative h-1 w-48 cursor-pointer rounded-full bg-border-muted lg:w-96">
-              <div className="h-full w-[35%] rounded-full bg-main transition-all" />
-              <div className="absolute left-[35%] top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-[2px] border-main bg-white opacity-0 transition-opacity group-hover:opacity-100" />
-            </div>
-            <span className="w-8 font-mono text-[10px] tabular-nums text-fg-subtle">{trackDuration}</span>
-          </div>
-        </div>
-
-        {/* Right: Volume + extras */}
-        <div className="hidden items-center gap-3 lg:flex">
-          <button className="cursor-pointer text-fg-subtle transition-colors hover:text-foreground" aria-label="Lyrics">
-            <MicIcon />
-          </button>
-          <button className="cursor-pointer text-fg-subtle transition-colors hover:text-foreground" aria-label="Queue">
-            <ListIcon />
-          </button>
-          <div className="mx-1 h-4 w-px bg-border-muted" />
-          <button className="cursor-pointer text-fg-subtle transition-colors hover:text-foreground" aria-label="Volume">
-            <VolumeIcon />
-          </button>
-          <div className="group relative h-1 w-24 cursor-pointer rounded-full bg-border-muted">
-            <div className="h-full w-[70%] rounded-full bg-fg-muted transition-colors group-hover:bg-main" />
-            <div className="absolute left-[70%] top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white opacity-0 transition-opacity group-hover:opacity-100" />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};

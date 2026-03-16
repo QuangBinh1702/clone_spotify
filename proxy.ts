@@ -1,16 +1,21 @@
+import { auth } from "@/auth";
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
-export function proxy(): NextResponse {
-  // const host = request.headers.get("host");
-  // if (host === "localhost:3000") {
-  //   const redirectUrl = request.nextUrl.clone();
-  //   redirectUrl.hostname = "127.0.0.1";
-  //   return NextResponse.redirect(redirectUrl, 307);
-  // }
+export async function proxy(request: NextRequest) {
+  const session = await auth();
+  const accessToken =
+    session?.access_token ??
+    ((session?.user as { access_token?: string } | undefined)?.access_token);
+
+  if (!accessToken) {
+    const url = new URL("/", request.url);
+    return NextResponse.redirect(url);
+  }
 
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/((?!_next|favicon.ico).*)"],
+  matcher: ["/music/:path*"],
 };

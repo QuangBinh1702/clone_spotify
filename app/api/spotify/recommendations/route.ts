@@ -1,5 +1,5 @@
 import { auth } from "@/auth";
-import { searchSpotify, SpotifyApiError } from "@/app/lib/spotify";
+import { getRecommendations, SpotifyApiError } from "@/app/lib/spotify";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
@@ -13,30 +13,15 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
 
   const { searchParams } = new URL(request.url);
-  const query = searchParams.get("q");
-  const typeParam = searchParams.get("type") ?? "track";
-  const type = typeParam
-    .split(",")
-    .map((t) => t.trim())
-    .filter(Boolean)
-    .filter((t): t is "track" | "artist" | "album" | "show" =>
-      ["track", "artist", "album", "show"].includes(t)
-    );
+  const seeds = searchParams.get("seed_artists");
+  const seedArtists = seeds ? seeds.split(",").map((s) => s.trim()).filter(Boolean) : [];
 
-  if (!query) {
-    return NextResponse.json(
-      { error: "Query parameter 'q' is required" },
-      { status: 400 }
-    );
+  if (seedArtists.length === 0) {
+    return NextResponse.json({ error: "seed_artists is required" }, { status: 400 });
   }
 
   try {
-    const data = await searchSpotify(
-      accessToken,
-      query,
-      type.length ? type : ["track"],
-      10
-    );
+    const data = await getRecommendations(accessToken, seedArtists, 8);
     return NextResponse.json(data);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";

@@ -34,6 +34,17 @@ export interface SpotifyAlbum {
   release_date: string;
   uri: string;
   type: string;
+  artists?: SpotifyArtist[];
+}
+
+export interface SpotifyShow {
+  id: string;
+  name: string;
+  images: SpotifyImage[];
+  publisher: string;
+  description?: string;
+  uri: string;
+  type: string;
 }
 
 export interface SpotifyTrack {
@@ -192,16 +203,51 @@ export async function getUserSavedTracks(
   });
 }
 
-export async function searchTracks(
+export async function getUserAlbums(
+  accessToken: string,
+  limit = 10,
+  offset = 0
+): Promise<SpotifyPaginatedResponse<{ added_at: string; album: SpotifyAlbum }>> {
+  return fetchSpotify<
+    SpotifyPaginatedResponse<{ added_at: string; album: SpotifyAlbum }>
+  >("/me/albums", accessToken, {
+    limit: String(limit),
+    offset: String(offset),
+  });
+}
+
+export async function searchSpotify(
   accessToken: string,
   query: string,
+  types: ("track" | "artist" | "album" | "show")[] = ["track"],
   limit = 10
-): Promise<{ tracks: SpotifyPaginatedResponse<SpotifyTrack> }> {
-  return fetchSpotify<{ tracks: SpotifyPaginatedResponse<SpotifyTrack> }>(
-    "/search",
-    accessToken,
-    { q: query, type: "track", limit: String(Math.min(limit, 10)) }
-  );
+): Promise<{
+  tracks?: SpotifyPaginatedResponse<SpotifyTrack>;
+  artists?: SpotifyPaginatedResponse<SpotifyArtist>;
+  albums?: SpotifyPaginatedResponse<SpotifyAlbum>;
+  shows?: SpotifyPaginatedResponse<SpotifyShow>;
+}> {
+  return fetchSpotify<{
+    tracks?: SpotifyPaginatedResponse<SpotifyTrack>;
+    artists?: SpotifyPaginatedResponse<SpotifyArtist>;
+    albums?: SpotifyPaginatedResponse<SpotifyAlbum>;
+    shows?: SpotifyPaginatedResponse<SpotifyShow>;
+  }>("/search", accessToken, {
+    q: query,
+    type: types.join(","),
+    limit: String(Math.min(limit, 10)),
+  });
+}
+
+export async function getRecommendations(
+  accessToken: string,
+  seedArtists: string[],
+  limit = 10
+): Promise<{ tracks: SpotifyTrack[] }> {
+  return fetchSpotify<{ tracks: SpotifyTrack[] }>("/recommendations", accessToken, {
+    seed_artists: seedArtists.slice(0, 5).join(","),
+    limit: String(Math.min(limit, 20)),
+  });
 }
 
 export function formatDuration(ms: number): string {

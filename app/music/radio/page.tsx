@@ -1,7 +1,11 @@
 "use client";
 
 import React from "react";
+import Image from "next/image";
 import MusicShell from "@/app/music/components/MusicShell";
+import { useMusicContext } from "@/app/music/context";
+import { useTopArtists, useRecommendations } from "@/app/lib/hooks";
+import { getImageUrl, formatDuration } from "@/app/lib/spotify";
 
 const LIVE_STATIONS = [
   { name: "Neo FM", host: "Live from Tokyo", listeners: "12.4k", color: "bg-purple-300" },
@@ -27,7 +31,29 @@ const TOPICS = [
   "Ambient",
 ];
 
+const ARTIST_COLORS = [
+  "bg-yellow-300", "bg-pink-300", "bg-green-300", "bg-purple-300",
+  "bg-orange-300", "bg-cyan-300", "bg-red-300", "bg-amber-300",
+];
+
+const Skeleton: React.FC<{ className?: string }> = ({ className = "" }) => (
+  <div className={`animate-pulse rounded-[5px] bg-border-muted ${className}`} />
+);
+
 const RadioPage: React.FC = () => {
+  const { isAuthenticated, login } = useMusicContext();
+  const { data: topArtists, loading: artistsLoading } = useTopArtists();
+  const seedArtists = topArtists?.items?.slice(0, 4).map((artist) => artist.id) ?? [];
+  const { data: recommendations, loading: recLoading } = useRecommendations(seedArtists);
+
+  const personalizedStations = topArtists?.items?.slice(0, 4).map((artist, i) => ({
+    id: artist.id,
+    title: `Radio based on ${artist.name}`,
+    subtitle: artist.genres?.slice(0, 2).join(" · ") || "Personalized mix",
+    imageUrl: getImageUrl(artist.images, "small"),
+    color: ARTIST_COLORS[i % ARTIST_COLORS.length],
+  })) ?? [];
+
   return (
     <MusicShell title="Radio" subtitle="Live stations & curated waves">
       <section className="rounded-[18px] bg-surface p-6 shadow-[0_20px_60px_rgba(0,0,0,0.18)] dark:shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
@@ -85,29 +111,119 @@ const RadioPage: React.FC = () => {
               Refresh
             </button>
           </div>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            {FOR_YOU.map((station) => (
-              <div
-                key={station.title}
-                className="group flex items-center gap-3 rounded-[14px] border border-border-muted bg-background p-3 transition-all hover:border-border"
-              >
-                <div
-                  className={`flex h-12 w-12 items-center justify-center rounded-[10px] border border-border-muted ${station.color} text-xs font-bold text-black`}
-                >
-                  MIX
-                </div>
-                <div>
-                  <p className="text-sm font-bold">{station.title}</p>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-fg-subtle">
-                    {station.subtitle}
-                  </p>
-                </div>
-                <button className="ml-auto hidden rounded-full bg-main px-4 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-black group-hover:flex">
-                  Play
-                </button>
+
+          {isAuthenticated ? (
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              {artistsLoading || recLoading
+                ? Array.from({ length: 4 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="flex items-center gap-3 rounded-[14px] border border-border-muted bg-background p-3"
+                    >
+                      <Skeleton className="h-12 w-12 rounded-[10px]" />
+                      <div className="flex-1">
+                        <Skeleton className="mb-1.5 h-3.5 w-3/4" />
+                        <Skeleton className="h-2.5 w-1/2" />
+                      </div>
+                    </div>
+                  ))
+                : recommendations?.tracks?.length
+                  ? recommendations.tracks.slice(0, 4).map((track, idx) => (
+                      <div
+                        key={track.id}
+                        className="group flex items-center gap-3 rounded-[14px] border border-border-muted bg-background p-3 transition-all hover:border-border"
+                      >
+                        {getImageUrl(track.album.images, "small") ? (
+                          <Image
+                            src={getImageUrl(track.album.images, "small")!}
+                            alt={track.name}
+                            width={48}
+                            height={48}
+                            className="h-12 w-12 rounded-[10px] border border-border-muted object-cover"
+                          />
+                        ) : (
+                          <div
+                            className={`flex h-12 w-12 items-center justify-center rounded-[10px] border border-border-muted ${ARTIST_COLORS[idx % ARTIST_COLORS.length]} text-xs font-bold text-black`}
+                          >
+                            MIX
+                          </div>
+                        )}
+                        <div>
+                          <p className="text-sm font-bold">{track.name}</p>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-fg-subtle">
+                            {track.artists.map((a) => a.name).join(", ")} ?? {formatDuration(track.duration_ms)}
+                          </p>
+                        </div>
+                        <button className="ml-auto hidden rounded-full bg-main px-4 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-black group-hover:flex">
+                          Play
+                        </button>
+                      </div>
+                    ))
+                  : personalizedStations.map((station) => (
+                      <div
+                        key={station.id}
+                        className="group flex items-center gap-3 rounded-[14px] border border-border-muted bg-background p-3 transition-all hover:border-border"
+                      >
+                        {station.imageUrl ? (
+                          <Image
+                            src={station.imageUrl}
+                            alt={station.title}
+                            width={48}
+                            height={48}
+                            className="h-12 w-12 rounded-[10px] border border-border-muted object-cover"
+                          />
+                        ) : (
+                          <div
+                            className={`flex h-12 w-12 items-center justify-center rounded-[10px] border border-border-muted ${station.color} text-xs font-bold text-black`}
+                          >
+                            MIX
+                          </div>
+                        )}
+                        <div>
+                          <p className="text-sm font-bold">{station.title}</p>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-fg-subtle">
+                            {station.subtitle}
+                          </p>
+                        </div>
+                        <button className="ml-auto hidden rounded-full bg-main px-4 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-black group-hover:flex">
+                          Play
+                        </button>
+                      </div>
+                    ))}
+            </div>
+          ) : (
+            <>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                {FOR_YOU.map((station) => (
+                  <div
+                    key={station.title}
+                    className="group flex items-center gap-3 rounded-[14px] border border-border-muted bg-background p-3 transition-all hover:border-border"
+                  >
+                    <div
+                      className={`flex h-12 w-12 items-center justify-center rounded-[10px] border border-border-muted ${station.color} text-xs font-bold text-black`}
+                    >
+                      MIX
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold">{station.title}</p>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-fg-subtle">
+                        {station.subtitle}
+                      </p>
+                    </div>
+                    <button className="ml-auto hidden rounded-full bg-main px-4 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-black group-hover:flex">
+                      Play
+                    </button>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+              <button
+                onClick={login}
+                className="mt-4 w-full rounded-full border border-border-muted bg-main px-5 py-2.5 text-xs font-bold uppercase tracking-[0.2em] text-black transition-colors hover:bg-main/80"
+              >
+                Connect Spotify to unlock personalized radio
+              </button>
+            </>
+          )}
         </div>
 
         <div className="rounded-[16px] bg-surface p-5">
