@@ -1281,7 +1281,14 @@ const NowPlayingPanel: React.FC<{
               <SkipBackIcon />
             </button>
             <button
-              onClick={onTogglePlay}
+              onClick={() => {
+                if (!hasPreview && track?.uri) {
+                  const url = `https://open.spotify.com/${track.uri.replace("spotify:", "").replace(/:/g, "/")}`;
+                  window.open(url, "_blank", "noopener,noreferrer");
+                  return;
+                }
+                onTogglePlay();
+              }}
               className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-main text-black shadow-brutal-sm transition-all hover:scale-105"
               aria-label={isPlaying ? "Pause" : "Play"}
             >

@@ -106,6 +106,7 @@ const PlayerBar: React.FC = () => {
     likedTracks,
     effectiveTracks,
     embedUri,
+    hasPreview,
   } = useMusicContext();
 
   const [showLyrics, setShowLyrics] = useState(false);
@@ -216,7 +217,14 @@ const PlayerBar: React.FC = () => {
               <SkipBackIcon />
             </button>
             <button
-              onClick={togglePlay}
+              onClick={() => {
+                if (!hasPreview && embedUri) {
+                  const url = `https://open.spotify.com/${embedUri.replace("spotify:", "").replace(/:/g, "/")}`;
+                  window.open(url, "_blank", "noopener,noreferrer");
+                  return;
+                }
+                togglePlay();
+              }}
               className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-[5px] border-[2px] border-black bg-main text-black shadow-brutal-sm transition-all hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none"
               aria-label={isPlaying ? "Pause" : "Play"}
             >
