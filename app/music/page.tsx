@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import Image from "next/image";
 import { signIn } from "next-auth/react";
 import MusicShell from "@/app/music/components/MusicShell";
@@ -12,6 +12,9 @@ import {
   usePlaylists,
   useSavedTracks,
   useSearch,
+  useBrowseTracks,
+  useFeaturedPlaylists,
+  useBrowseCategories,
 } from "@/app/lib/hooks";
 import {
   formatDuration,
@@ -52,7 +55,26 @@ const FALLBACK_ARTISTS: {
   { name: "Heavy Weight", listeners: "870K", color: "bg-cyan-300", initial: "HW" },
 ];
 
-const GENRES = [
+const GENRE_COLORS_MAP = [
+  "bg-cyan-300", "bg-yellow-300", "bg-pink-300", "bg-green-300",
+  "bg-orange-300", "bg-purple-300", "bg-red-300", "bg-amber-200",
+  "bg-lime-300", "bg-teal-300", "bg-rose-300", "bg-indigo-300",
+  "bg-emerald-300", "bg-fuchsia-300", "bg-sky-300", "bg-violet-300",
+  "bg-blue-300", "bg-slate-300", "bg-stone-300", "bg-zinc-300",
+];
+
+const GENRE_SIZES = [
+  "col-span-2 row-span-2",
+  "col-span-1 row-span-1",
+  "col-span-1 row-span-2",
+  "col-span-1 row-span-1",
+  "col-span-2 row-span-1",
+  "col-span-1 row-span-1",
+  "col-span-1 row-span-1",
+  "col-span-1 row-span-1",
+];
+
+const FALLBACK_GENRES = [
   { name: "Electronic", color: "bg-cyan-300", size: "col-span-2 row-span-2" },
   { name: "Hip Hop", color: "bg-yellow-300", size: "col-span-1 row-span-1" },
   { name: "Indie Rock", color: "bg-pink-300", size: "col-span-1 row-span-2" },
@@ -128,93 +150,11 @@ const HeartIcon: React.FC<{ filled?: boolean }> = ({ filled }) => (
   </svg>
 );
 
-const VolumeIcon: React.FC = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-    <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
-    <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
-  </svg>
-);
-
-const SearchIcon: React.FC = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="11" cy="11" r="8" />
-    <path d="m21 21-4.3-4.3" />
-  </svg>
-);
-
-const HomeIcon: React.FC = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" />
-    <path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-  </svg>
-);
-
-const LibraryIcon: React.FC = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-    <path d="m16 6 4 14" />
-    <path d="M12 6v14" />
-    <path d="M8 8v12" />
-    <path d="M4 4v16" />
-  </svg>
-);
-
 const MusicNoteIcon: React.FC<{ size?: number }> = ({ size = 20 }) => (
   <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
     <path d="M9 18V5l12-2v13" />
     <circle cx="6" cy="18" r="3" />
     <circle cx="18" cy="16" r="3" />
-  </svg>
-);
-
-const MenuIcon: React.FC = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="4" x2="20" y1="12" y2="12" />
-    <line x1="4" x2="20" y1="6" y2="6" />
-    <line x1="4" x2="20" y1="18" y2="18" />
-  </svg>
-);
-
-const CloseIcon: React.FC = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M18 6 6 18" />
-    <path d="m6 6 12 12" />
-  </svg>
-);
-
-const MicIcon: React.FC = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-    <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-    <line x1="12" x2="12" y1="19" y2="22" />
-  </svg>
-);
-
-const RadioIcon: React.FC = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9" />
-    <path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.4" />
-    <circle cx="12" cy="12" r="2" />
-    <path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.4" />
-    <path d="M19.1 4.9C23 8.8 23 15.1 19.1 19" />
-  </svg>
-);
-
-const UserIcon: React.FC = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M19 21a7 7 0 0 0-14 0" />
-    <circle cx="12" cy="8" r="4" />
-  </svg>
-);
-
-const ListIcon: React.FC = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="8" x2="21" y1="6" y2="6" />
-    <line x1="8" x2="21" y1="12" y2="12" />
-    <line x1="8" x2="21" y1="18" y2="18" />
-    <line x1="3" x2="3.01" y1="6" y2="6" />
-    <line x1="3" x2="3.01" y1="12" y2="12" />
-    <line x1="3" x2="3.01" y1="18" y2="18" />
   </svg>
 );
 
@@ -235,6 +175,9 @@ const MusicPage: React.FC = () => {
     embedUri, likedTracks, toggleLike,
     searchQuery, activeSearchQuery, handleSearchInput,
     playTrack, playPlaylist, login, logout,
+    browseTracks, browseLoading,
+    nextTrack, prevTrack, hasPreview,
+    effectiveTracks: ctxEffectiveTracks,
   } = useMusicContext();
 
   const [timeRange, setTimeRange] = useState<"short_term" | "medium_term" | "long_term">("medium_term");
@@ -244,6 +187,34 @@ const MusicPage: React.FC = () => {
   const { data: playlists, loading: playlistsLoading } = usePlaylists();
   const { data: savedTracks } = useSavedTracks();
   const { data: searchResults, loading: searchLoading } = useSearch(activeSearchQuery);
+
+  // Public browse data for non-auth or empty auth
+  const { data: featuredPlaylists, loading: featuredLoading } = useFeaturedPlaylists();
+  const { data: browseCategories, loading: categoriesLoading } = useBrowseCategories();
+
+  // Determine effective data: user data if available, else browse data
+  const effectiveTracks = (isAuthenticated && topTracks?.items && topTracks.items.length > 0)
+    ? topTracks.items
+    : browseTracks.length > 0 ? browseTracks : null;
+  const effectiveTracksLoading = isAuthenticated ? topTracksLoading : browseLoading;
+
+  const effectivePlaylists = (isAuthenticated && playlists?.items && playlists.items.length > 0)
+    ? playlists.items
+    : featuredPlaylists?.items ?? null;
+  const effectivePlaylistsLoading = isAuthenticated ? playlistsLoading : featuredLoading;
+
+  const fallbackDisplayTracks = useMemo(() => ctxEffectiveTracks.length > 0 ? ctxEffectiveTracks : browseTracks, [ctxEffectiveTracks, browseTracks]);
+
+  const likedDisplayTracks = useMemo(() => {
+    // Prioritize saved tracks, then liked IDs intersecting available tracks
+    if (isAuthenticated && savedTracks?.items && savedTracks.items.length > 0) {
+      return savedTracks.items.slice(0, 8).map((item) => item.track).filter(Boolean);
+    }
+    if (likedTracks.size > 0) {
+      return ctxEffectiveTracks.filter((t) => likedTracks.has(t.id)).slice(0, 8);
+    }
+    return [] as SpotifyTrack[];
+  }, [ctxEffectiveTracks, likedTracks, savedTracks, isAuthenticated]);
 
   return (
     <MusicShell
@@ -274,6 +245,13 @@ const MusicPage: React.FC = () => {
           isAuthenticated={isAuthenticated}
           track={currentTrack}
           fallbackTrack={currentFallbackTrack}
+          isPlaying={isPlaying}
+          onTogglePlay={togglePlay}
+          onNext={nextTrack}
+          onPrev={prevTrack}
+          hasPreview={hasPreview}
+          effectiveTracks={ctxEffectiveTracks}
+          currentTrackIndex={currentTrackIndex}
         />
       }
     >
@@ -292,7 +270,20 @@ const MusicPage: React.FC = () => {
       {!activeSearchQuery && (
         <>
           <HeroSection isPlaying={isPlaying} onToggle={togglePlay} isAuthenticated={isAuthenticated} />
-          <QuickPicks isAuthenticated={isAuthenticated} savedTracks={savedTracks?.items ?? null} />
+          <QuickPicks isAuthenticated={isAuthenticated} savedTracks={savedTracks?.items ?? null} browseTracks={browseTracks} onPlay={playTrack} />
+
+          <FavoritesSection
+            isAuthenticated={isAuthenticated}
+            favoriteTracks={likedDisplayTracks}
+            loading={searchLoading || (isAuthenticated && topTracksLoading && savedTracks === undefined)}
+            onPlay={playTrack}
+          />
+
+          <LibraryShortcuts
+            isAuthenticated={isAuthenticated}
+            playlists={effectivePlaylists}
+            savedCount={savedTracks?.items?.length ?? 0}
+          />
 
           {/* Spotify Embed Player */}
           {embedUri && (
@@ -319,8 +310,8 @@ const MusicPage: React.FC = () => {
 
           <TrendingSection
             isAuthenticated={isAuthenticated}
-            spotifyTracks={topTracks?.items ?? null}
-            loading={topTracksLoading}
+            spotifyTracks={effectiveTracks}
+            loading={effectiveTracksLoading}
             timeRange={timeRange}
             onTimeRangeChange={setTimeRange}
             onPlay={playTrack}
@@ -328,12 +319,20 @@ const MusicPage: React.FC = () => {
             onToggleLike={toggleLike}
           />
 
-          <GenreMosaic />
+          <TrackListSection
+            tracks={fallbackDisplayTracks}
+            fallback={FALLBACK_TRACKS}
+            onPlay={playTrack}
+            likedTracks={likedTracks}
+            onToggleLike={toggleLike}
+          />
+
+          <GenreMosaic categories={browseCategories?.items ?? null} loading={categoriesLoading} />
 
           <PlaylistsSection
             isAuthenticated={isAuthenticated}
-            spotifyPlaylists={playlists?.items ?? null}
-            loading={playlistsLoading}
+            spotifyPlaylists={effectivePlaylists}
+            loading={effectivePlaylistsLoading}
             onPlayPlaylist={playPlaylist}
           />
 
@@ -359,10 +358,6 @@ export default MusicPage;
 const Skeleton: React.FC<{ className?: string }> = ({ className = "" }) => (
   <div className={`animate-pulse rounded-[5px] bg-border-muted ${className}`} />
 );
-
-/* ────────────────────────────────────────────────────────── */
-/*  Hero                                                     */
-/* ────────────────────────────────────────────────────────── */
 
 /* ────────────────────────────────────────────────────────── */
 /*  Hero                                                     */
@@ -483,15 +478,37 @@ const HeroSection: React.FC<{
 const QuickPicks: React.FC<{
   isAuthenticated: boolean;
   savedTracks: { added_at: string; track: SpotifyTrack }[] | null;
-}> = ({ isAuthenticated, savedTracks }) => {
-  const picks = isAuthenticated && savedTracks && savedTracks.length > 0
-    ? savedTracks.slice(0, 6).map((item) => ({
+  browseTracks: SpotifyTrack[];
+  onPlay: (track: SpotifyTrack, index: number) => void;
+}> = ({ isAuthenticated, savedTracks, browseTracks, onPlay }) => {
+  // Use saved tracks if authenticated and available, else browse tracks, else fallback
+  const hasSaved = isAuthenticated && savedTracks && savedTracks.length > 0;
+  const hasBrowse = browseTracks.length > 0;
+
+  const picks = hasSaved
+    ? savedTracks!.slice(0, 6).map((item, idx) => ({
         title: item.track.name,
         subtitle: item.track.artists.map((a) => a.name).join(", "),
         color: TRACK_COLORS[item.track.name.charCodeAt(0) % TRACK_COLORS.length],
         image: getImageUrl(item.track.album.images, "small"),
+        spotifyTrack: item.track,
+        idx,
       }))
-    : QUICK_PICKS.map((p) => ({ ...p, image: null as string | null }));
+    : hasBrowse
+      ? browseTracks.slice(0, 6).map((track, idx) => ({
+          title: track.name,
+          subtitle: track.artists.map((a) => a.name).join(", "),
+          color: TRACK_COLORS[track.name.charCodeAt(0) % TRACK_COLORS.length],
+          image: getImageUrl(track.album.images, "small"),
+          spotifyTrack: track,
+          idx,
+        }))
+      : QUICK_PICKS.map((p) => ({
+          ...p,
+          image: null as string | null,
+          spotifyTrack: null as SpotifyTrack | null,
+          idx: 0,
+        }));
 
   return (
     <section className="border-b-[2px] border-border-muted bg-background">
@@ -501,6 +518,9 @@ const QuickPicks: React.FC<{
             <button
               key={pick.title}
               className="group flex cursor-pointer items-center gap-3 overflow-hidden rounded-[5px] border-[2px] border-border-muted bg-surface-hover transition-all hover:border-border hover:bg-surface-hover"
+              onClick={() => {
+                if (pick.spotifyTrack) onPlay(pick.spotifyTrack, pick.idx);
+              }}
             >
               <div className={`flex h-14 w-14 shrink-0 items-center justify-center ${pick.color}`}>
                 {pick.image ? (
@@ -523,6 +543,120 @@ const QuickPicks: React.FC<{
     </section>
   );
 };
+
+/* ────────────────────────────────────────────────────────── */
+/*  Favorites                                                 */
+/* ────────────────────────────────────────────────────────── */
+
+const FavoritesSection: React.FC<{
+  isAuthenticated: boolean;
+  favoriteTracks: SpotifyTrack[];
+  loading: boolean;
+  onPlay: (track: SpotifyTrack, index: number) => void;
+}> = ({ isAuthenticated, favoriteTracks, loading, onPlay }) => (
+  <section className="border-b-[2px] border-border-muted bg-background">
+    <div className="mx-auto max-w-7xl px-4 py-10 md:px-6 md:py-12">
+      <div className="mb-6 flex items-end justify-between">
+        <div>
+          <span className="mb-1 block text-[10px] font-bold uppercase tracking-[0.2em] text-main">
+            {isAuthenticated ? "Yêu thích" : "Bộ sưu tập"}
+          </span>
+          <h2 className="text-2xl font-bold tracking-tight md:text-3xl">Favorites</h2>
+          <p className="text-sm text-fg-subtle">Những bài bạn đã lưu hoặc thả tim gần đây.</p>
+        </div>
+        <a href="/music/library" className="text-xs font-bold uppercase tracking-wider text-fg-muted transition-colors hover:text-foreground">
+          Xem thư viện →
+        </a>
+      </div>
+
+      {loading ? (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="rounded-[5px] border-[2px] border-border-muted bg-surface p-4">
+              <Skeleton className="mb-3 h-10 w-full" />
+              <Skeleton className="h-3 w-28" />
+            </div>
+          ))}
+        </div>
+      ) : favoriteTracks.length > 0 ? (
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {favoriteTracks.slice(0, 6).map((track, idx) => (
+            <button
+              key={track.id}
+              onClick={() => onPlay(track, idx)}
+              className="group flex items-center gap-3 rounded-[6px] border-[2px] border-border-muted bg-surface px-4 py-3 text-left transition-all hover:border-border hover:bg-surface-hover"
+            >
+              <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-[4px] border-[2px] border-black ${TRACK_COLORS[idx % TRACK_COLORS.length]} overflow-hidden shadow-brutal-sm`}>
+                {track.album.images?.[0]?.url ? (
+                  <Image src={getImageUrl(track.album.images, "small") ?? ""} alt={track.name} className="h-full w-full object-cover" width={48} height={48} />
+                ) : (
+                  <MusicNoteIcon size={16} />
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-bold text-foreground">{track.name}</p>
+                <p className="truncate text-[11px] font-medium text-fg-subtle">{track.artists.map((a) => a.name).join(", ")}</p>
+              </div>
+              <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-fg-subtle">
+                <PlayIcon size={12} />
+              </div>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-[6px] border-[2px] border-border-muted bg-surface px-4 py-5 text-sm font-medium text-fg-subtle">
+          Chưa có bài yêu thích. Hãy thả tim một bài hát để thấy danh sách này.
+        </div>
+      )}
+    </div>
+  </section>
+);
+
+/* ────────────────────────────────────────────────────────── */
+/*  Library Shortcuts                                         */
+/* ────────────────────────────────────────────────────────── */
+
+const LibraryShortcuts: React.FC<{
+  isAuthenticated: boolean;
+  playlists: SpotifyPlaylist[] | null;
+  savedCount: number;
+}> = ({ isAuthenticated, playlists, savedCount }) => (
+  <section className="border-b-[2px] border-border-muted bg-background">
+    <div className="mx-auto max-w-7xl px-4 py-8 md:px-6">
+      <div className="mb-4 flex items-center justify-between">
+        <div>
+          <span className="mb-1 block text-[10px] font-bold uppercase tracking-[0.2em] text-main">Thư viện</span>
+          <h2 className="text-xl font-bold tracking-tight">Nhanh tay mở nhạc</h2>
+        </div>
+        <a href="/music/library" className="text-xs font-bold uppercase tracking-wider text-fg-muted transition-colors hover:text-foreground">
+          Mở Library
+        </a>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <a href="/music/library" className="group flex h-full items-center justify-between rounded-[6px] border-[2px] border-border-muted bg-surface px-4 py-3 transition-all hover:border-border hover:bg-surface-hover">
+          <div>
+            <p className="text-sm font-bold text-foreground">Tất cả Playlist</p>
+            <p className="text-[11px] font-medium text-fg-subtle">{playlists ? `${playlists.length} playlist` : "Khám phá playlist"}</p>
+          </div>
+          <div className="rounded-full border-[2px] border-black bg-main px-3 py-1 text-[11px] font-bold text-black shadow-brutal-sm">→</div>
+        </a>
+
+        <a href="/music/library" className="group flex h-full items-center justify-between rounded-[6px] border-[2px] border-border-muted bg-surface px-4 py-3 transition-all hover:border-border hover:bg-surface-hover">
+          <div>
+            <p className="text-sm font-bold text-foreground">Bài đã lưu</p>
+            <p className="text-[11px] font-medium text-fg-subtle">{savedCount > 0 ? `${savedCount} bài đã lưu` : "Chưa có bài đã lưu"}</p>
+          </div>
+          <div className="rounded-full border-[2px] border-black bg-main px-3 py-1 text-[11px] font-bold text-black shadow-brutal-sm">♥</div>
+        </a>
+
+        <div className="flex h-full items-center justify-between rounded-[6px] border-[2px] border-dashed border-border-muted bg-surface px-4 py-3 text-left text-sm font-medium text-fg-subtle">
+          Gợi ý: tạo playlist mới từ gợi ý trending.
+        </div>
+      </div>
+    </div>
+  </section>
+);
 
 /* ────────────────────────────────────────────────────────── */
 /*  Search Results                                           */
@@ -622,7 +756,14 @@ const TrackRow: React.FC<{
     </div>
 
     <div className="min-w-0 flex-1">
-      <p className="truncate text-sm font-bold text-foreground">{track.name}</p>
+      <div className="flex items-center gap-2">
+        <p className="truncate text-sm font-bold text-foreground">{track.name}</p>
+        {track.preview_url && (
+          <span className="shrink-0 rounded bg-main/20 px-1 py-0.5 text-[8px] font-bold uppercase text-main">
+            Preview
+          </span>
+        )}
+      </div>
       <p className="truncate text-xs font-medium text-fg-muted">
         {track.artists.map((a) => a.name).join(", ")}
       </p>
@@ -726,7 +867,7 @@ const TrendingSection: React.FC<{
               <Skeleton className="h-3 w-14" />
             </div>
           ))
-        ) : isAuthenticated && spotifyTracks && spotifyTracks.length > 0 ? (
+        ) : spotifyTracks && spotifyTracks.length > 0 ? (
           spotifyTracks.map((track, idx) => (
             <TrackRow
               key={track.id}
@@ -773,33 +914,120 @@ const TrendingSection: React.FC<{
 );
 
 /* ────────────────────────────────────────────────────────── */
-/*  Genre Mosaic                                             */
+/*  Track List (always visible)                              */
 /* ────────────────────────────────────────────────────────── */
 
-const GenreMosaic: React.FC = () => (
+const TrackListSection: React.FC<{
+  tracks: SpotifyTrack[];
+  fallback: typeof FALLBACK_TRACKS;
+  onPlay: (track: SpotifyTrack, index: number) => void;
+  likedTracks: Set<string>;
+  onToggleLike: (id: string) => void;
+}> = ({ tracks, fallback, onPlay, likedTracks, onToggleLike }) => (
   <section className="border-b-[2px] border-border-muted">
-    <div className="mx-auto max-w-7xl px-4 py-10 md:px-6 md:py-14">
-      <div className="mb-6">
-        <span className="mb-1 block text-[10px] font-bold uppercase tracking-[0.2em] text-main">Explore</span>
-        <h2 className="text-2xl font-bold tracking-tight md:text-3xl">Browse Genres</h2>
+    <div className="mx-auto max-w-7xl px-4 py-10 md:px-6 md:py-12">
+      <div className="mb-6 flex items-end justify-between">
+        <div>
+          <span className="mb-1 block text-[10px] font-bold uppercase tracking-[0.2em] text-main">Danh sách nhạc</span>
+          <h2 className="text-2xl font-bold tracking-tight md:text-3xl">Đang phát hành</h2>
+          <p className="text-sm text-fg-subtle">Luôn có nhạc để nghe — kể cả khi bạn chưa đăng nhập.</p>
+        </div>
       </div>
 
-      <div className="grid auto-rows-[80px] grid-cols-4 gap-2.5 md:auto-rows-[100px] lg:grid-cols-6">
-        {GENRES.map((genre) => (
-          <button
-            key={genre.name}
-            className={`${genre.size} group relative cursor-pointer overflow-hidden rounded-[5px] border-[2px] border-black ${genre.color} shadow-brutal-sm transition-all hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-brutal`}
-          >
-            <div className="absolute -right-8 -top-8 h-24 w-24 rotate-45 bg-black/[0.06]" />
-            <div className="absolute bottom-3 left-4 text-left">
-              <span className="text-sm font-bold text-black md:text-base">{genre.name}</span>
+      <div className="space-y-1">
+        {tracks && tracks.length > 0 ? (
+          tracks.slice(0, 12).map((track, idx) => (
+            <TrackRow
+              key={track.id}
+              track={track}
+              index={idx}
+              onPlay={onPlay}
+              isLiked={likedTracks.has(track.id)}
+              onToggleLike={onToggleLike}
+            />
+          ))
+        ) : (
+          fallback.slice(0, 8).map((track, idx) => (
+            <div key={track.id} className="flex items-center gap-4 rounded-[5px] px-3 py-2.5 transition-all hover:bg-surface-hover md:px-4">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center">
+                <span className="text-sm font-bold tabular-nums text-fg-subtle">{String(idx + 1).padStart(2, "0")}</span>
+              </div>
+              <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-[4px] border-[2px] border-black ${track.color} shadow-brutal-sm md:h-11 md:w-11`}>
+                <MusicNoteIcon size={14} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-bold text-foreground">{track.title}</p>
+                <p className="truncate text-xs font-medium text-fg-muted">{track.artist}</p>
+              </div>
+              <span className="hidden truncate text-xs font-medium text-fg-subtle lg:block lg:w-36">{track.album}</span>
+              <span className="w-14 text-right font-mono text-xs text-fg-subtle">{track.duration}</span>
             </div>
-          </button>
-        ))}
+          ))
+        )}
       </div>
     </div>
   </section>
 );
+
+/* ────────────────────────────────────────────────────────── */
+/*  Genre Mosaic (now with real Spotify categories)          */
+/* ────────────────────────────────────────────────────────── */
+
+const GenreMosaic: React.FC<{
+  categories: { id: string; name: string; icons: { url: string }[] }[] | null;
+  loading: boolean;
+}> = ({ categories, loading }) => {
+  const genreItems = categories && categories.length > 0
+    ? categories.slice(0, 8).map((cat, idx) => ({
+        name: cat.name,
+        color: GENRE_COLORS_MAP[idx % GENRE_COLORS_MAP.length],
+        size: GENRE_SIZES[idx % GENRE_SIZES.length],
+        icon: cat.icons?.[0]?.url ?? null,
+      }))
+    : FALLBACK_GENRES.map((g) => ({ ...g, icon: null as string | null }));
+
+  return (
+    <section className="border-b-[2px] border-border-muted">
+      <div className="mx-auto max-w-7xl px-4 py-10 md:px-6 md:py-14">
+        <div className="mb-6">
+          <span className="mb-1 block text-[10px] font-bold uppercase tracking-[0.2em] text-main">Explore</span>
+          <h2 className="text-2xl font-bold tracking-tight md:text-3xl">Browse Genres</h2>
+        </div>
+
+        {loading ? (
+          <div className="grid auto-rows-[80px] grid-cols-4 gap-2.5 md:auto-rows-[100px] lg:grid-cols-6">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <Skeleton key={i} className={`rounded-[5px] ${GENRE_SIZES[i % GENRE_SIZES.length]}`} />
+            ))}
+          </div>
+        ) : (
+          <div className="grid auto-rows-[80px] grid-cols-4 gap-2.5 md:auto-rows-[100px] lg:grid-cols-6">
+            {genreItems.map((genre) => (
+              <button
+                key={genre.name}
+                className={`${genre.size} group relative cursor-pointer overflow-hidden rounded-[5px] border-[2px] border-black ${genre.color} shadow-brutal-sm transition-all hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-brutal`}
+              >
+                {genre.icon && (
+                  <Image
+                    src={genre.icon}
+                    alt={genre.name}
+                    className="absolute right-0 top-0 h-full w-1/2 object-cover opacity-30 transition-opacity group-hover:opacity-50"
+                    width={100}
+                    height={100}
+                  />
+                )}
+                <div className="absolute -right-8 -top-8 h-24 w-24 rotate-45 bg-black/[0.06]" />
+                <div className="absolute bottom-3 left-4 text-left">
+                  <span className="text-sm font-bold text-black md:text-base">{genre.name}</span>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+};
 
 /* ────────────────────────────────────────────────────────── */
 /*  Playlists                                                */
@@ -816,14 +1044,14 @@ const PlaylistsSection: React.FC<{
       <div className="mb-6 flex items-end justify-between">
         <div>
           <span className="mb-1 block text-[10px] font-bold uppercase tracking-[0.2em] text-main">
-            {isAuthenticated ? "Your Library" : "Made for you"}
+            {isAuthenticated && spotifyPlaylists ? "Your Library" : "Featured"}
           </span>
           <h2 className="text-2xl font-bold tracking-tight md:text-3xl">
-            {isAuthenticated ? "Your Playlists" : "Popular Playlists"}
+            {isAuthenticated && spotifyPlaylists ? "Your Playlists" : "Popular Playlists"}
           </h2>
         </div>
         <a href="#" className="flex cursor-pointer items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-fg-muted transition-colors hover:text-foreground">
-          View all <span className="text-sm">→</span>
+          View all <span className="text-sm">&rarr;</span>
         </a>
       </div>
 
@@ -838,7 +1066,7 @@ const PlaylistsSection: React.FC<{
               </div>
             </div>
           ))
-        ) : isAuthenticated && spotifyPlaylists && spotifyPlaylists.length > 0 ? (
+        ) : spotifyPlaylists && spotifyPlaylists.length > 0 ? (
           spotifyPlaylists.slice(0, 6).map((pl, idx) => (
             <div
               key={pl.id}
@@ -873,7 +1101,7 @@ const PlaylistsSection: React.FC<{
                 <h3 className="mb-0.5 text-sm font-bold text-foreground">{pl.name}</h3>
                 <p className="text-[11px] font-medium text-fg-subtle">
                   {(pl.items?.total ?? pl.tracks?.total ?? 0)} tracks
-                  {pl.description && ` · ${pl.description.slice(0, 40)}${pl.description.length > 40 ? "…" : ""}`}
+                  {pl.description && ` · ${pl.description.slice(0, 40)}${pl.description.length > 40 ? "..." : ""}`}
                 </p>
               </div>
             </div>
@@ -996,7 +1224,7 @@ const FooterSection: React.FC = () => (
         </div>
 
         <p className="text-[10px] font-medium text-fg-subtle" suppressHydrationWarning>
-          © {CURRENT_YEAR} neobeats. All rights reserved.
+          &copy; {CURRENT_YEAR} neobeats. All rights reserved.
         </p>
       </div>
     </div>
@@ -1004,20 +1232,28 @@ const FooterSection: React.FC = () => (
 );
 
 /* ────────────────────────────────────────────────────────── */
-/*  Now Playing Panel (right rail)                           */
+/*  Now Playing Panel (right rail) — fully interactive       */
 /* ────────────────────────────────────────────────────────── */
 
 const NowPlayingPanel: React.FC<{
   isAuthenticated: boolean;
   track: SpotifyTrack | null;
   fallbackTrack: FallbackTrack;
-}> = ({ isAuthenticated, track, fallbackTrack }) => {
-  const trackTitle = isAuthenticated && track ? track.name : fallbackTrack.title;
-  const trackArtist = isAuthenticated && track
+  isPlaying: boolean;
+  onTogglePlay: () => void;
+  onNext: () => void;
+  onPrev: () => void;
+  hasPreview: boolean;
+  effectiveTracks: SpotifyTrack[];
+  currentTrackIndex: number;
+}> = ({ isAuthenticated, track, fallbackTrack, isPlaying, onTogglePlay, onNext, onPrev, hasPreview, effectiveTracks, currentTrackIndex }) => {
+  const hasTrack = !!track;
+  const trackTitle = track ? track.name : fallbackTrack.title;
+  const trackArtist = track
     ? track.artists.map((a) => a.name).join(", ")
     : fallbackTrack.artist;
-  const trackAlbum = isAuthenticated && track ? track.album.name : fallbackTrack.album;
-  const albumImage = isAuthenticated && track ? getImageUrl(track.album.images, "medium") : null;
+  const trackAlbum = track ? track.album.name : fallbackTrack.album;
+  const albumImage = track ? getImageUrl(track.album.images, "medium") : null;
 
   return (
     <div className="sticky top-[72px] space-y-4">
@@ -1040,20 +1276,63 @@ const NowPlayingPanel: React.FC<{
                 <MusicNoteIcon size={32} />
               </div>
             )}
+            {/* Play overlay on album art */}
+            <button
+              onClick={onTogglePlay}
+              className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors hover:bg-black/30"
+              aria-label={isPlaying ? "Pause" : "Play"}
+            >
+              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-main/90 text-black opacity-0 shadow-lg transition-opacity hover:opacity-100 group-hover:opacity-100"
+                style={{ opacity: isPlaying ? 0.8 : undefined }}
+              >
+                {isPlaying ? <PauseIcon size={20} /> : <PlayIcon size={20} />}
+              </div>
+            </button>
           </div>
           <div className="space-y-1 px-4 py-3">
             <p className="text-sm font-bold">{trackTitle}</p>
             <p className="text-xs text-fg-subtle">{trackArtist}</p>
             <p className="text-[11px] text-fg-subtle">{trackAlbum}</p>
           </div>
-          <div className="flex items-center gap-2 px-4 pb-4">
-            <button className="rounded-full bg-main px-4 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-black">
-              Play
+          {/* Player controls */}
+          <div className="flex items-center justify-center gap-4 px-4 pb-4">
+            <button
+              onClick={onPrev}
+              className="cursor-pointer text-fg-muted transition-colors hover:text-foreground"
+              aria-label="Previous"
+            >
+              <SkipBackIcon />
             </button>
-            <button className="rounded-full border border-border-muted px-4 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-fg-subtle">
-              Queue
+            <button
+              onClick={onTogglePlay}
+              className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-main text-black shadow-brutal-sm transition-all hover:scale-105"
+              aria-label={isPlaying ? "Pause" : "Play"}
+            >
+              {isPlaying ? <PauseIcon size={16} /> : <PlayIcon size={16} />}
+            </button>
+            <button
+              onClick={onNext}
+              className="cursor-pointer text-fg-muted transition-colors hover:text-foreground"
+              aria-label="Next"
+            >
+              <SkipForwardIcon />
             </button>
           </div>
+          {/* Preview availability indicator */}
+          {hasTrack && !hasPreview && (
+            <div className="border-t border-border-muted px-4 py-2">
+              <p className="text-center text-[10px] font-medium text-fg-subtle">
+                No preview available. Use Spotify embed below to listen.
+              </p>
+            </div>
+          )}
+          {hasTrack && hasPreview && (
+            <div className="border-t border-border-muted px-4 py-2">
+              <p className="text-center text-[10px] font-medium text-main">
+                Playing 30s preview
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1062,18 +1341,37 @@ const NowPlayingPanel: React.FC<{
           Up Next
         </p>
         <div className="mt-3 space-y-3">
-          {FALLBACK_TRACKS.slice(0, 3).map((next) => (
-            <div key={next.id} className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-semibold">{next.title}</p>
-                <p className="text-[11px] text-fg-subtle">{next.artist}</p>
-              </div>
-              <span className="text-[10px] font-semibold text-fg-subtle">{next.duration}</span>
-            </div>
-          ))}
+          {effectiveTracks.length > 0
+            ? Array.from({ length: 3 }).map((_, offset) => {
+                const idx = (currentTrackIndex + 1 + offset) % effectiveTracks.length;
+                const upNext = effectiveTracks[idx];
+                if (!upNext) return null;
+                return (
+                  <div key={upNext.id} className="flex items-center justify-between">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold">{upNext.name}</p>
+                      <p className="truncate text-[11px] text-fg-subtle">
+                        {upNext.artists.map((a) => a.name).join(", ")}
+                      </p>
+                    </div>
+                    <span className="ml-2 shrink-0 text-[10px] font-semibold text-fg-subtle">
+                      {formatDuration(upNext.duration_ms)}
+                    </span>
+                  </div>
+                );
+              })
+            : FALLBACK_TRACKS.slice(0, 3).map((next) => (
+                <div key={next.id} className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold">{next.title}</p>
+                    <p className="text-[11px] text-fg-subtle">{next.artist}</p>
+                  </div>
+                  <span className="text-[10px] font-semibold text-fg-subtle">{next.duration}</span>
+                </div>
+              ))
+          }
         </div>
       </div>
     </div>
   );
 };
-

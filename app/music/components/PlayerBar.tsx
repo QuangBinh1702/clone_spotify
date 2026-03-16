@@ -1,8 +1,8 @@
 "use client";
 
-import React from "react";
+import React, { useMemo, useState } from "react";
 import Image from "next/image";
-import { useMusicContext, TRACK_COLORS } from "@/app/music/context";
+import { useMusicContext, TRACK_COLORS, FALLBACK_TRACKS } from "@/app/music/context";
 import { formatDuration, getImageUrl } from "@/app/lib/spotify";
 
 /* ─── Icons ─── */
@@ -104,7 +104,11 @@ const PlayerBar: React.FC = () => {
     isShuffle, repeatMode,
     toggleLike, toggleShuffle, cycleRepeat, setVolume, seekTo,
     likedTracks,
+    effectiveTracks,
   } = useMusicContext();
+
+  const [showLyrics, setShowLyrics] = useState(false);
+  const [showQueue, setShowQueue] = useState(false);
 
   const trackTitle = isAuthenticated && currentTrack ? currentTrack.name : currentFallbackTrack.title;
   const trackArtist = isAuthenticated && currentTrack
@@ -125,10 +129,32 @@ const PlayerBar: React.FC = () => {
 
   const isLiked = currentTrack?.id ? likedTracks.has(currentTrack.id) : false;
 
+  const queueItems = useMemo(() => {
+    if (effectiveTracks.length > 0) {
+      return Array.from({ length: Math.min(5, effectiveTracks.length) }).map((_, idx) => {
+        const queueIndex = (idx + 1) % effectiveTracks.length;
+        const item = effectiveTracks[queueIndex];
+        return {
+          id: item.id,
+          title: item.name,
+          artist: item.artists.map((a) => a.name).join(", "),
+          duration: formatDuration(item.duration_ms),
+        };
+      });
+    }
+
+    return FALLBACK_TRACKS.slice(0, 5).map((item) => ({
+      id: String(item.id),
+      title: item.title,
+      artist: item.artist,
+      duration: item.duration,
+    }));
+  }, [effectiveTracks]);
+
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 border-t-[2px] border-border-muted bg-background lg:bottom-0">
       <div className="absolute -top-[2px] left-0 h-[2px] w-full">
-        <div className="h-full w-[35%] bg-main transition-all" />
+        <div className="h-full bg-main transition-all" style={{ width: progressPercent }} />
       </div>
 
       <div className="flex items-center justify-between gap-4 px-4 py-2 md:px-6">
@@ -210,10 +236,18 @@ const PlayerBar: React.FC = () => {
 
         {/* Right: Volume + extras */}
         <div className="hidden items-center gap-3 lg:flex">
-          <button className="cursor-pointer text-fg-subtle transition-colors hover:text-foreground" aria-label="Lyrics">
+          <button
+            onClick={() => { setShowLyrics((v) => !v); setShowQueue(false); }}
+            className={`cursor-pointer transition-colors ${showLyrics ? "text-main" : "text-fg-subtle hover:text-foreground"}`}
+            aria-label="Lyrics"
+          >
             <MicIcon />
           </button>
-          <button className="cursor-pointer text-fg-subtle transition-colors hover:text-foreground" aria-label="Queue">
+          <button
+            onClick={() => { setShowQueue((v) => !v); setShowLyrics(false); }}
+            className={`cursor-pointer transition-colors ${showQueue ? "text-main" : "text-fg-subtle hover:text-foreground"}`}
+            aria-label="Queue"
+          >
             <ListIcon />
           </button>
           <div className="mx-1 h-4 w-px bg-border-muted" />
@@ -236,6 +270,61 @@ const PlayerBar: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Floating panels for lyrics and queue */}
+      {(showLyrics || showQueue) && (
+        <div className="pointer-events-none absolute bottom-16 right-4 z-[60] flex max-w-md flex-col gap-3">
+          {showLyrics && (
+            <div className="pointer-events-auto rounded-[10px] border-[2px] border-black bg-surface p-4 shadow-brutal-sm">
+              <div className="mb-2 flex items-center justify-between text-[11px] font-bold uppercase tracking-[0.18em] text-fg-subtle">
+                <span>Lyrics</span>
+                <button
+                  onClick={() => setShowLyrics(false)}
+                  className="rounded-[5px] border border-border-muted px-2 py-1 text-[10px] font-semibold text-fg-muted hover:border-border"
+                  aria-label="Close lyrics"
+                >
+                  Close
+                </button>
+              </div>
+              <p className="text-sm font-semibold text-foreground">
+                {trackTitle}
+              </p>
+              <p className="text-[11px] font-medium text-fg-subtle mb-3">
+                {trackArtist}
+              </p>
+              <p className="text-xs leading-relaxed text-fg-subtle">
+                Lyrics are not available for 30s previews. Use the Spotify player above for full lyrics when available.
+              </p>
+            </div>
+          )}
+
+          {showQueue && (
+            <div className="pointer-events-auto rounded-[10px] border-[2px] border-black bg-surface p-4 shadow-brutal-sm">
+              <div className="mb-2 flex items-center justify-between text-[11px] font-bold uppercase tracking-[0.18em] text-fg-subtle">
+                <span>Queue</span>
+                <button
+                  onClick={() => setShowQueue(false)}
+                  className="rounded-[5px] border border-border-muted px-2 py-1 text-[10px] font-semibold text-fg-muted hover:border-border"
+                  aria-label="Close queue"
+                >
+                  Close
+                </button>
+              </div>
+              <div className="space-y-2">
+                {queueItems.map((item) => (
+                  <div key={item.id} className="flex items-center justify-between gap-3 rounded-[6px] border border-border-muted bg-background px-3 py-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-foreground">{item.title}</p>
+                      <p className="truncate text-[11px] font-medium text-fg-subtle">{item.artist}</p>
+                    </div>
+                    <span className="shrink-0 text-[10px] font-mono text-fg-subtle">{item.duration}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

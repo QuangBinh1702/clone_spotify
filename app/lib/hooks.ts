@@ -189,3 +189,39 @@ export function useSearchTyped(
     shows?: SpotifyPaginatedResponse<SpotifyShow>;
   }>(url);
 }
+
+/* ─── Browse hooks (public, no login required) ─── */
+
+export interface BrowseData {
+  newReleases: SpotifyPaginatedResponse<SpotifyAlbum> | null;
+  featuredPlaylists: SpotifyPaginatedResponse<SpotifyPlaylist> | null;
+  categories: SpotifyPaginatedResponse<{ id: string; name: string; icons: { url: string }[] }> | null;
+}
+
+export function useBrowse(): UseFetchResult<BrowseData> {
+  return useFetch<BrowseData>("/api/spotify/browse");
+}
+
+export function useBrowseTracks(genre = "pop"): UseFetchResult<SpotifyPaginatedResponse<SpotifyTrack>> {
+  return useFetch<SpotifyPaginatedResponse<SpotifyTrack>>(
+    `/api/spotify/browse-tracks?genre=${encodeURIComponent(genre)}&limit=20`
+  );
+}
+
+export function useFeaturedPlaylists(): UseFetchResult<SpotifyPaginatedResponse<SpotifyPlaylist>> {
+  return useFetch<SpotifyPaginatedResponse<SpotifyPlaylist>>(
+    "/api/spotify/browse?section=featured&limit=10"
+  );
+}
+
+export function useNewReleases(): UseFetchResult<SpotifyPaginatedResponse<SpotifyAlbum>> {
+  return useFetch<SpotifyPaginatedResponse<SpotifyAlbum>>(
+    "/api/spotify/browse?section=new-releases&limit=10"
+  );
+}
+
+export function useBrowseCategories(): UseFetchResult<SpotifyPaginatedResponse<{ id: string; name: string; icons: { url: string }[] }>> {
+  return useFetch<SpotifyPaginatedResponse<{ id: string; name: string; icons: { url: string }[] }>>(
+    "/api/spotify/browse?section=categories&limit=20"
+  );
+}

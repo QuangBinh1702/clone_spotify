@@ -5,6 +5,7 @@ import { useSession, signIn, signOut } from "next-auth/react";
 import {
   useTopTracks,
   usePlaylists,
+  useBrowseTracks,
 } from "@/app/lib/hooks";
 import type { SpotifyTrack } from "@/app/lib/spotify";
 
@@ -38,6 +39,10 @@ interface MusicContextValue {
   logout: () => void;
   userName: string | null;
 
+  /* Browse tracks (public, no login) */
+  browseTracks: SpotifyTrack[];
+  browseLoading: boolean;
+
   /* Player state */
   isPlaying: boolean;
   currentTrackIndex: number;
@@ -50,6 +55,7 @@ interface MusicContextValue {
   volume: number;
   isShuffle: boolean;
   repeatMode: "off" | "all" | "one";
+  hasPreview: boolean;
 
   /* Player actions */
   togglePlay: () => void;
@@ -70,6 +76,9 @@ interface MusicContextValue {
 
   /* Track count for prev/next cycling */
   totalTracks: number;
+
+  /* The effective tracks list (user top tracks, or browse tracks, or fallback) */
+  effectiveTracks: SpotifyTrack[];
 }
 
 const MusicContext = createContext<MusicContextValue | null>(null);
@@ -99,15 +108,35 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [isShuffle, setIsShuffle] = useState(false);
   const [repeatMode, setRepeatMode] = useState<"off" | "all" | "one">("off");
 
+  // User's personal data
   const { data: topTracks } = useTopTracks("medium_term");
   const { data: playlists } = usePlaylists();
+
+  // Public browse data (always fetched, used when no personal data)
+  const { data: browseTracksData, loading: browseLoading } = useBrowseTracks("pop");
 
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  const totalTracks = topTracks?.items?.length || FALLBACK_TRACKS.length;
-  const currentTrack = overrideTrack ?? topTracks?.items?.[currentTrackIndex] ?? null;
+  // Build the effective tracks list:
+  // 1. If authenticated and has top tracks -> use those
+  // 2. Otherwise if browse tracks available -> use those
+  // 3. Empty array (will fall back to FALLBACK_TRACKS in UI)
+  const browseTracks = browseTracksData?.items ?? [];
+  const userTracks = topTracks?.items ?? [];
+
+  const effectiveTracks: SpotifyTrack[] =
+    isAuthenticated && userTracks.length > 0
+      ? userTracks
+      : browseTracks;
+
+  const totalTracks = effectiveTracks.length || FALLBACK_TRACKS.length;
+  const currentTrack = overrideTrack ?? effectiveTracks[currentTrackIndex] ?? null;
   const currentFallbackTrack = FALLBACK_TRACKS[currentTrackIndex % FALLBACK_TRACKS.length];
+
+  const hasPreview = !!(currentTrack?.preview_url);
+
+  /* ─── Player actions ─── */
 
   const togglePlay = useCallback(() => {
     setIsPlaying((p) => !p);
@@ -117,21 +146,19 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     (track: SpotifyTrack, index?: number) => {
       if (typeof index === "number") setCurrentTrackIndex(index);
       setOverrideTrack(track);
-      if (isAuthenticated) setEmbedUri(track.uri);
+      setEmbedUri(track.uri);
       setIsPlaying(true);
     },
-    [isAuthenticated],
+    [],
   );
 
   const playPlaylist = useCallback(
     (uri: string) => {
-      if (isAuthenticated) {
-        setOverrideTrack(null);
-        setEmbedUri(uri);
-        setIsPlaying(true);
-      }
+      setOverrideTrack(null);
+      setEmbedUri(uri);
+      setIsPlaying(true);
     },
-    [isAuthenticated],
+    [],
   );
 
   const nextTrack = useCallback(() => {
@@ -215,12 +242,16 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setRepeatMode((prev) => (prev === "off" ? "all" : prev === "all" ? "one" : "off"));
   }, []);
 
+  /* ─── Audio element management ─── */
+
+  // Keep volume in sync
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
     audio.volume = volume;
   }, [volume]);
 
+  // Load preview_url when current track changes
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -238,24 +269,29 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     audio.load();
     if (isPlaying) {
       void audio.play().catch(() => {
-        setIsPlaying(false);
+        // preview may not be available in some regions
       });
     }
-  }, [currentTrack?.preview_url, isPlaying]);
+    // We intentionally only react to track changes, not isPlaying changes here
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentTrack?.id, currentTrack?.preview_url]);
 
+  // Play/pause sync
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
+    if (!audio.src || audio.src === "") return;
 
     if (isPlaying) {
       void audio.play().catch(() => {
-        setIsPlaying(false);
+        // Autoplay may be blocked
       });
     } else {
       audio.pause();
     }
   }, [isPlaying]);
 
+  // Audio event listeners
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -291,6 +327,9 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     logout,
     userName: session?.user?.name ?? null,
 
+    browseTracks,
+    browseLoading,
+
     isPlaying,
     currentTrackIndex,
     currentTrack,
@@ -302,6 +341,7 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     volume,
     isShuffle,
     repeatMode,
+    hasPreview,
 
     togglePlay,
     playTrack,
@@ -319,6 +359,7 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     handleSearchInput,
 
     totalTracks,
+    effectiveTracks,
   };
 
   return (
