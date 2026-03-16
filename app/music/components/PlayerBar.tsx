@@ -105,6 +105,7 @@ const PlayerBar: React.FC = () => {
     toggleLike, toggleShuffle, cycleRepeat, setVolume, seekTo,
     likedTracks,
     effectiveTracks,
+    embedUri,
   } = useMusicContext();
 
   const [showLyrics, setShowLyrics] = useState(false);
@@ -153,6 +154,27 @@ const PlayerBar: React.FC = () => {
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 border-t-[2px] border-border-muted bg-background lg:bottom-0">
+      {embedUri && (
+        <div className="border-b border-border-muted bg-background/95 px-4 py-3 shadow-brutal-sm backdrop-blur">
+          <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-main">Spotify Player</p>
+              <p className="text-sm font-semibold text-foreground">If preview is unavailable, use this embed.</p>
+            </div>
+            <div className="w-full max-w-xl overflow-hidden rounded-[10px] border border-border-muted">
+              <iframe
+                src={`https://open.spotify.com/embed/${embedUri.replace("spotify:", "").replace(/:/g, "/")}?utm_source=generator&theme=0`}
+                width="100%"
+                height="80"
+                allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                loading="lazy"
+                className="border-0"
+                title="Spotify Player"
+              />
+            </div>
+          </div>
+        </div>
+      )}
       <div className="absolute -top-[2px] left-0 h-[2px] w-full">
         <div className="h-full bg-main transition-all" style={{ width: progressPercent }} />
       </div>

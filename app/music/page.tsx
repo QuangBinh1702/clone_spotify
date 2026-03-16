@@ -285,29 +285,6 @@ const MusicPage: React.FC = () => {
             savedCount={savedTracks?.items?.length ?? 0}
           />
 
-          {/* Spotify Embed Player */}
-          {embedUri && (
-            <section className="border-b border-border-muted bg-background">
-              <div className="mx-auto max-w-7xl px-4 py-6 md:px-6">
-                <div className="mb-3">
-                  <span className="mb-1 block text-[10px] font-bold uppercase tracking-[0.2em] text-main">Now Playing</span>
-                  <h2 className="text-xl font-bold tracking-tight">Spotify Player</h2>
-                </div>
-                <div className="overflow-hidden rounded-[12px] border border-border-muted">
-                  <iframe
-                    src={`https://open.spotify.com/embed/${embedUri.replace("spotify:", "").replace(/:/g, "/")}?utm_source=generator&theme=0`}
-                    width="100%"
-                    height="152"
-                    allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                    loading="lazy"
-                    className="border-0"
-                    title="Spotify Player"
-                  />
-                </div>
-              </div>
-            </section>
-          )}
-
           <TrendingSection
             isAuthenticated={isAuthenticated}
             spotifyTracks={effectiveTracks}

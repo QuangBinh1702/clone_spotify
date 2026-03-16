@@ -29,6 +29,8 @@ const MusicShell: React.FC<MusicShellProps> = ({
   const pathname = usePathname();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [libraryQuery, setLibraryQuery] = useState("");
+  const [showHistory, setShowHistory] = useState(false);
+  const [searchHistory, setSearchHistory] = useState<string[]>([]);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const sidebarItems = useMemo(() => ["Daily Mix 1", "Late Night Code", "Focus Mode", "Neon City", "Workout Raw"], []);
   const filteredSidebarItems = sidebarItems.filter((item) =>
@@ -52,8 +54,45 @@ const MusicShell: React.FC<MusicShellProps> = ({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [showSearch]);
   const searchInputProps = onSearchChange
-    ? { value: searchQuery ?? "", onChange: (event: React.ChangeEvent<HTMLInputElement>) => onSearchChange(event.target.value) }
+    ? {
+        value: searchQuery ?? "",
+        onChange: (event: React.ChangeEvent<HTMLInputElement>) => onSearchChange(event.target.value),
+        onKeyDown: (event: React.KeyboardEvent<HTMLInputElement>) => {
+          if (event.key === "Enter") {
+            const value = (event.currentTarget as HTMLInputElement).value.trim();
+            if (!value) return;
+            setSearchHistory((prev) => {
+              const next = [value, ...prev.filter((q) => q !== value)].slice(0, 6);
+              localStorage.setItem("nb-search-history", JSON.stringify(next));
+              return next;
+            });
+          }
+        },
+        onFocus: () => setShowHistory(true),
+        onBlur: () => setTimeout(() => setShowHistory(false), 120),
+        autoComplete: "off",
+      }
     : {};
+
+  useEffect(() => {
+    if (!showSearch) return;
+    const saved = localStorage.getItem("nb-search-history");
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) setSearchHistory(parsed.slice(0, 6));
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  }, [showSearch]);
+
+  useEffect(() => {
+    if (!showSearch || !onSearchChange) return;
+    if (pathname === "/music") {
+      onSearchChange("");
+    }
+  }, [pathname, showSearch, onSearchChange]);
 
   return (
     <div className="spotify-shell min-h-screen bg-background text-foreground">
@@ -143,16 +182,36 @@ const MusicShell: React.FC<MusicShellProps> = ({
               </div>
               {showSearch && (
                 <div className="hidden flex-1 items-center justify-center px-6 lg:flex">
-                  <div className="flex w-full max-w-lg items-center gap-2.5 rounded-full border border-border-muted bg-background px-4 py-2">
-                    <SearchIcon />
-                    <input
-                      type="text"
-                      placeholder="Search Spotify tracks..."
-                      className="w-full bg-transparent text-sm font-medium text-foreground outline-none placeholder:text-fg-subtle"
-                      ref={searchInputRef}
-                      {...searchInputProps}
-                    />
-                    <span className="hidden rounded-full border border-border-muted px-2 py-0.5 font-mono text-[10px] text-fg-subtle lg:block">/</span>
+                  <div className="relative w-full max-w-lg">
+                    <div className="flex items-center gap-2.5 rounded-full border border-border-muted bg-background px-4 py-2">
+                      <SearchIcon />
+                      <input
+                        type="text"
+                        placeholder="Search Spotify tracks..."
+                        className="w-full bg-transparent text-sm font-medium text-foreground outline-none placeholder:text-fg-subtle"
+                        ref={searchInputRef}
+                        {...searchInputProps}
+                      />
+                      <span className="hidden rounded-full border border-border-muted px-2 py-0.5 font-mono text-[10px] text-fg-subtle lg:block">/</span>
+                    </div>
+                    {showHistory && searchHistory.length > 0 && (
+                      <div className="absolute left-0 right-0 top-[110%] z-50 overflow-hidden rounded-[10px] border border-border-muted bg-background shadow-lg">
+                        {searchHistory.map((item) => (
+                          <button
+                            key={item}
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => {
+                              onSearchChange?.(item);
+                              setShowHistory(false);
+                            }}
+                            className="flex w-full items-center justify-between px-4 py-2 text-sm text-foreground transition-colors hover:bg-surface-hover"
+                          >
+                            <span className="truncate">{item}</span>
+                            <span className="text-[10px] uppercase tracking-[0.2em] text-fg-subtle">History</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

@@ -73,6 +73,7 @@ interface MusicContextValue {
   searchQuery: string;
   activeSearchQuery: string;
   handleSearchInput: (value: string) => void;
+  clearSearch: () => void;
 
   /* Track count for prev/next cycling */
   totalTracks: number;
@@ -146,8 +147,9 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     (track: SpotifyTrack, index?: number) => {
       if (typeof index === "number") setCurrentTrackIndex(index);
       setOverrideTrack(track);
-      setEmbedUri(track.uri);
+      setEmbedUri(track.preview_url ? null : track.uri);
       setIsPlaying(true);
+      setCurrentTime(0);
     },
     [],
   );
@@ -217,6 +219,15 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setSearchQuery(value);
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
     searchTimeoutRef.current = setTimeout(() => setActiveSearchQuery(value), 500);
+  }, []);
+
+  const clearSearch = useCallback(() => {
+    setSearchQuery("");
+    setActiveSearchQuery("");
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+      searchTimeoutRef.current = null;
+    }
   }, []);
 
   const login = useCallback(() => signIn("spotify", { callbackUrl: "/music" }), []);
@@ -357,6 +368,7 @@ export const MusicProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     searchQuery,
     activeSearchQuery,
     handleSearchInput,
+    clearSearch,
 
     totalTracks,
     effectiveTracks,

@@ -38,6 +38,22 @@ const SearchPage: React.FC = () => {
   const [inputValue, setInputValue] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [activeType, setActiveType] = useState<"track" | "artist" | "album" | "show">("track");
+  const [history, setHistory] = useState<string[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
+
+  useEffect(() => {
+    setInputValue("");
+    setDebouncedQuery("");
+    const saved = localStorage.getItem("nb-search-history");
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) setHistory(parsed.slice(0, 6));
+      } catch {
+        /* noop */
+      }
+    }
+  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedQuery(inputValue.trim()), 400);
@@ -77,9 +93,44 @@ const SearchPage: React.FC = () => {
               placeholder="What do you want to listen to?"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  const val = inputValue.trim();
+                  if (!val) return;
+                  setHistory((prev) => {
+                    const next = [val, ...prev.filter((q) => q !== val)].slice(0, 6);
+                    localStorage.setItem("nb-search-history", JSON.stringify(next));
+                    return next;
+                  });
+                  setShowHistory(false);
+                }
+              }}
+              onFocus={() => setShowHistory(true)}
+              onBlur={() => setTimeout(() => setShowHistory(false), 120)}
+              autoComplete="off"
               className="w-64 bg-transparent text-sm text-foreground outline-none placeholder:text-fg-subtle"
             />
           </div>
+          {showHistory && history.length > 0 && (
+            <div className="relative w-full max-w-xl">
+              <div className="absolute left-0 right-0 top-2 z-30 overflow-hidden rounded-[10px] border border-border-muted bg-background shadow-lg">
+                {history.map((item) => (
+                  <button
+                    key={item}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      setInputValue(item);
+                      setShowHistory(false);
+                    }}
+                    className="flex w-full items-center justify-between px-4 py-2 text-sm text-foreground transition-colors hover:bg-surface-hover"
+                  >
+                    <span className="truncate">{item}</span>
+                    <span className="text-[10px] uppercase tracking-[0.2em] text-fg-subtle">History</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
